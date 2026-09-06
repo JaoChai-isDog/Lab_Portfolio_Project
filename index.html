@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Engineering Lab Portfolio & PDF Generator</title>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Master Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <nav class="navbar">
+    <div class="brand">
+      <div class="brand-icon">
+        <i class="fa-solid fa-flask-vial"></i>
+      </div>
+      <div>
+        <div class="brand-title">Engineering Lab Portfolio</div>
+        <div class="brand-subtitle">DUAL LAYOUT & PDF GENERATOR</div>
+      </div>
+    </div>
+
+    <!-- View Switcher -->
+    <div class="view-switcher">
+      <button class="view-btn active" data-view="editor">
+        <i class="fa-solid fa-pen-to-square"></i> กรอกข้อมูล (Editor)
+      </button>
+      <button class="view-btn" data-view="web">
+        <i class="fa-solid fa-desktop"></i> Web Portfolio View
+      </button>
+      <button class="view-btn" data-view="a4">
+        <i class="fa-solid fa-file-pdf"></i> A4 Document View
+      </button>
+    </div>
+
+    <!-- Actions & Presets -->
+    <div class="nav-actions">
+      <select id="select-preset" class="select-preset" title="โหลดตัวอย่าง Lab">
+        <option value="electrical">⚡ โหลดตัวอย่าง: วิศวกรรมไฟฟ้า (RLC Circuit)</option>
+        <option value="civil">🏗️ โหลดตัวอย่าง: วิศวกรรมโยธา (Tensile Test)</option>
+        <option value="mechanical">⚙️ โหลดตัวอย่าง: วิศวกรรมเครื่องกล (Heat Exchanger)</option>
+      </select>
+
+      <button id="btn-new-lab" class="btn btn-secondary" title="สร้าง Lab ใหม่">
+        <i class="fa-solid fa-plus"></i> ใหม่
+      </button>
+
+      <button id="btn-export-json" class="btn btn-secondary" title="ส่งออกข้อมูล JSON">
+        <i class="fa-solid fa-download"></i> JSON
+      </button>
+
+      <label class="btn btn-secondary" style="cursor:pointer;" title="นำเข้าข้อมูล JSON">
+        <i class="fa-solid fa-upload"></i> นำเข้า
+        <input type="file" id="file-import-json" accept=".json" style="display:none">
+      </label>
+
+      <button id="btn-export-pdf" class="btn btn-primary">
+        <i class="fa-solid fa-file-pdf"></i> ดาวน์โหลด PDF
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- ===================================================================
+         SECTION 1: FORM EDITOR VIEW
+         =================================================================== -->
+    <section id="view-editor" class="view-section active">
+      
+      <!-- Card 1: ข้อมูลทั่วไป -->
+      <div class="editor-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <i class="fa-solid fa-circle-info"></i> 1. ข้อมูลทั่วไปเกี่ยวกับการทดลอง (General Information)
+          </div>
+        </div>
+        
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">ชื่อการทดลอง (Lab Title)</label>
+            <input type="text" id="inp-lab-title" class="form-control" placeholder="เช่น การทดสอบวงจร RLC อนุกรม">
+          </div>
+          <div class="form-group">
+            <label class="form-label">รหัสการทดลอง / รหัสวิชา (Lab Code)</label>
+            <input type="text" id="inp-lab-code" class="form-control" placeholder="เช่น EE-201-LAB04">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">ชื่อวิชา (Subject Name)</label>
+            <input type="text" id="inp-subject" class="form-control" placeholder="วิศวกรรมวงจรไฟฟ้า 2">
+          </div>
+          <div class="form-group">
+            <label class="form-label">สถาบัน / มหาวิทยาลัย (Institution)</label>
+            <input type="text" id="inp-institution" class="form-control" placeholder="คณะวิศวกรรมศาสตร์ มหาวิทยาลัยเทคโนโลยี">
+          </div>
+        </div>
+
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label class="form-label">ภาควิชา / สาขา (Department)</label>
+            <input type="text" id="inp-department" class="form-control" placeholder="ภาควิชาวิศวกรรมไฟฟ้า">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ผู้ทำปฏิบัติการ (Student Name)</label>
+            <input type="text" id="inp-student-name" class="form-control" placeholder="นาย ภานุวัฒน์ รัตนเดชวิบูลย์">
+          </div>
+          <div class="form-group">
+            <label class="form-label">รหัสนักศึกษา (Student ID)</label>
+            <input type="text" id="inp-student-id" class="form-control" placeholder="65010984">
+          </div>
+        </div>
+
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label class="form-label">กลุ่มการทดลอง (Group No.)</label>
+            <input type="text" id="inp-group" class="form-control" placeholder="กลุ่มที่ 3">
+          </div>
+          <div class="form-group">
+            <label class="form-label">อาจารย์ผู้ตรวจ / ผู้ควบคุม (Instructor)</label>
+            <input type="text" id="inp-instructor" class="form-control" placeholder="ผศ. ดร. สมชาย วิทยาการ">
+          </div>
+          <div class="form-group">
+            <label class="form-label">วันที่ทำทดลอง (Date)</label>
+            <input type="date" id="inp-date" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">สถานที่ทดลอง (Location)</label>
+          <input type="text" id="inp-location" class="form-control" placeholder="ห้องปฏิบัติการ EE-302">
+        </div>
+      </div>
+
+      <!-- Card 2: วัตถุประสงค์และทฤษฎี -->
+      <div class="editor-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <i class="fa-solid fa-book-open"></i> 2. วัตถุประสงค์และทฤษฎี (Objective & Theory)
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">วัตถุประสงค์ (Objectives)</label>
+          <textarea id="inp-objective" class="form-control" placeholder="1. เพื่อศึกษา...&#10;2. เพื่อทดสอบ..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ทฤษฎีและหลักการ (Theory & Background)</label>
+          <textarea id="inp-theory" class="form-control" style="min-height:140px;" placeholder="อธิบายทฤษฎีการทดลอง สมการ และหลักการทำงานที่เกี่ยวข้อง..."></textarea>
+        </div>
+      </div>
+
+      <!-- Card 3: รายการอุปกรณ์ -->
+      <div class="editor-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <i class="fa-solid fa-toolbox"></i> 3. รายการอุปกรณ์การทดลอง (Equipment List)
+          </div>
+          <button type="button" id="btn-add-equip" class="btn btn-success btn-sm">
+            <i class="fa-solid fa-plus"></i> เพิ่มอุปกรณ์
+          </button>
+        </div>
+        <div id="form-equip-container">
+          <!-- Dynamic Items inserted here -->
+        </div>
+      </div>
+
+      <!-- Card 4: ขั้นตอนการทดลอง -->
+      <div class="editor-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <i class="fa-solid fa-list-check"></i> 4. ขั้นตอนการทดลอง (Experimental Procedures)
+          </div>
+          <button type="button" id="btn-add-step" class="btn btn-success btn-sm">
+            <i class="fa-solid fa-plus"></i> เพิ่มขั้นตอน
+          </button>
+        </div>
+        <div id="form-steps-container">
+          <!-- Dynamic Steps inserted here -->
+        </div>
+      </div>
+
+      <!-- Card 5: ผลการทดลองและตาราง -->
+      <div class="editor-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <i class="fa-solid fa-table"></i> 5. ตารางผลการทดลอง (Experimental Data Table)
+          </div>
+          <button type="button" id="btn-add-result-row" class="btn btn-success btn-sm">
+            <i class="fa-solid fa-plus"></i> เพิ่มแถวข้อมูล
+          </button>
+        </div>
+        <div class="table-editor-wrapper" id="form-results-table-container">
+          <!-- Dynamic Table Editor inserted here -->
+        </div>
+      </div>
+
+      <!-- Card 6: สรุปและอภิปรายผล -->
+      <div class="editor-card">
+        <div class="editor-header">
+          <div class="editor-title">
+            <i class="fa-solid fa-chart-pie"></i> 6. สรุปและอภิปรายผล (Conclusion & Discussion)
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">สรุปผลการทดลองและการวิเคราะห์</label>
+          <textarea id="inp-conclusion" class="form-control" style="min-height:120px;" placeholder="สรุปผลการทดลอง เปรียบเทียบกับค่าตามทฤษฎี อภิปรายข้อผิดพลาดที่อาจเกิดขึ้น..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">URL หน้าเว็บ Portfolio (สำหรับสร้าง QR Code ในเอกสาร A4)</label>
+          <input type="text" id="inp-web-url" class="form-control" placeholder="https://yourname.github.io/Lab-Portfolio/#lab1">
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ===================================================================
+         SECTION 2: MODERN WEB PORTFOLIO VIEW
+         =================================================================== -->
+    <section id="view-web" class="view-section web-portfolio">
+      
+      <!-- Hero Banner -->
+      <div class="hero-card">
+        <div class="lab-badges">
+          <span class="badge badge-code" id="web-lab-code">EE-201-LAB04</span>
+          <span class="badge badge-subject" id="web-subject">วิศวกรรมวงจรไฟฟ้า 2</span>
+          <span class="badge badge-dept" id="web-department">ภาควิชาวิศวกรรมไฟฟ้า</span>
+        </div>
+        <h1 class="lab-hero-title" id="web-lab-title">การวิเคราะห์สภาวะเรโซแนนซ์และอิมพีแดนซ์ในวงจร RLC อนุกรม</h1>
+        
+        <div class="meta-info-grid">
+          <div class="meta-item">
+            <div class="meta-icon"><i class="fa-solid fa-user-graduate"></i></div>
+            <div class="meta-text">
+              <label>ผู้จัดทำ (Student)</label>
+              <span id="web-student-name">นาย ภานุวัฒน์ รัตนเดชวิบูลย์</span>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-icon"><i class="fa-solid fa-id-card"></i></div>
+            <div class="meta-text">
+              <label>รหัสนักศึกษา (ID)</label>
+              <span id="web-student-id">65010984</span>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-icon"><i class="fa-solid fa-users"></i></div>
+            <div class="meta-text">
+              <label>กลุ่ม / อาจารย์</label>
+              <span><strong id="web-group">กลุ่มที่ 3</strong> (<span id="web-instructor">ผศ. ดร. สมชาย</span>)</span>
+            </div>
+          </div>
+
+          <div class="meta-item">
+            <div class="meta-icon"><i class="fa-solid fa-calendar-day"></i></div>
+            <div class="meta-text">
+              <label>วันที่ทำทดลอง / สถานที่</label>
+              <span><span id="web-date">2026-08-15</span> @ <span id="web-location">EE-302</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Layout Grid -->
+      <div class="portfolio-grid">
+        
+        <!-- Left Main Column -->
+        <div class="main-column">
+          
+          <!-- Objectives & Theory Block -->
+          <div class="content-block">
+            <div class="block-header">
+              <i class="fa-solid fa-bullseye block-icon"></i>
+              <h2 class="block-title">วัตถุประสงค์และทฤษฎีหลักการ</h2>
+            </div>
+            <div style="margin-bottom:16px;">
+              <h3 style="font-size:0.9rem; color:var(--cyan-accent); margin-bottom:6px;">วัตถุประสงค์ของการทดลอง:</h3>
+              <div id="web-objective" class="text-content"></div>
+            </div>
+            <div>
+              <h3 style="font-size:0.9rem; color:var(--cyan-accent); margin-bottom:6px;">ทฤษฎีและหลักการ:</h3>
+              <div id="web-theory" class="text-content"></div>
+            </div>
+          </div>
+
+          <!-- Equipment Grid Block -->
+          <div class="content-block">
+            <div class="block-header">
+              <i class="fa-solid fa-microchip block-icon"></i>
+              <h2 class="block-title">รายการอุปกรณ์และเครื่องมือวัด</h2>
+            </div>
+            <div id="web-equip-grid" class="equip-grid">
+              <!-- Equipment Cards -->
+            </div>
+          </div>
+
+          <!-- Procedure Steps Block -->
+          <div class="content-block">
+            <div class="block-header">
+              <i class="fa-solid fa-diagram-project block-icon"></i>
+              <h2 class="block-title">ขั้นตอนและวิธีการทดลอง</h2>
+            </div>
+            <div id="web-steps-list" class="timeline-list">
+              <!-- Timeline Steps -->
+            </div>
+          </div>
+
+          <!-- Data Table & Chart Block -->
+          <div class="content-block">
+            <div class="block-header">
+              <i class="fa-solid fa-chart-line block-icon"></i>
+              <h2 class="block-title">ผลการทดลองและกราฟวิเคราะห์</h2>
+            </div>
+            <div id="web-table-container" class="data-table-wrapper" style="margin-bottom:20px;">
+              <!-- Data Table -->
+            </div>
+            <div>
+              <h3 style="font-size:0.95rem; color:var(--cyan-accent); margin-bottom:8px;">
+                <i class="fa-solid fa-chart-area"></i> กราฟวิเคราะห์ผลการทดลอง (Interactive Visualization)
+              </h3>
+              <div class="chart-container">
+                <canvas id="webChartCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conclusion Block -->
+          <div class="content-block">
+            <div class="block-header">
+              <i class="fa-solid fa-square-check block-icon"></i>
+              <h2 class="block-title">สรุปและอภิปรายผลการทดลอง</h2>
+            </div>
+            <div id="web-conclusion" class="text-content"></div>
+          </div>
+
+        </div>
+
+        <!-- Right Side Column (QR Code & Quick Links) -->
+        <div class="side-column">
+          <div class="qr-side-card">
+            <h3 style="font-size:1.1rem; color:#fff; margin-bottom:4px;">
+              <i class="fa-solid fa-qrcode" style="color:var(--cyan-accent)"></i> QR Code ประจำ Lab
+            </h3>
+            <p style="font-size:0.8rem; color:var(--text-muted);">
+              สแกนเพื่อเปิดดูผลงานและกราฟ Interactive ผ่านสมาร์ทโฟน
+            </p>
+            <div class="qr-frame">
+              <div id="web-qr-code"></div>
+            </div>
+            <div class="qr-url-text" id="web-url-text">https://aekay.github.io/Lab-Portfolio/</div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ===================================================================
+         SECTION 3: ACADEMIC A4 DOCUMENT PRINT VIEW
+         =================================================================== -->
+    <section id="view-a4" class="view-section">
+      <div class="a4-document-wrapper">
+        <div id="a4-document-content" class="a4-document">
+          
+          <!-- Official Academic Header -->
+          <div class="a4-header">
+            <div>
+              <div class="a4-inst-name" id="a4-inst-name">คณะวิศวกรรมศาสตร์ มหาวิทยาลัยเทคโนโลยี</div>
+              <div class="a4-dept-name" id="a4-dept-name">ภาควิชาวิศวกรรมไฟฟ้า | รายงานการทดลองทางวิศวกรรม</div>
+              <div style="margin-top:6px;">
+                <span style="background:#1e3a8a; color:#fff; padding:2px 8px; border-radius:3px; font-weight:700; font-size:9pt;" id="a4-lab-code">EE-201-LAB04</span>
+              </div>
+              <div class="a4-report-title" id="a4-lab-title">การวิเคราะห์สภาวะเรโซแนนซ์และอิมพีแดนซ์ในวงจร RLC อนุกรม</div>
+            </div>
+
+            <!-- Top-Right QR Code -->
+            <div class="a4-qr-box">
+              <div id="a4-qr-code"></div>
+              <div class="a4-qr-label">สแกนดูผลงานออนไลน์<br>(Interactive Web)</div>
+            </div>
+          </div>
+
+          <!-- Metadata Table -->
+          <table class="a4-meta-table">
+            <tr>
+              <td class="label">ผู้ทดลอง:</td>
+              <td class="val"><strong id="a4-student-name">นาย ภานุวัฒน์ รัตนเดชวิบูลย์</strong></td>
+              <td class="label">รหัสนักศึกษา:</td>
+              <td class="val"><strong id="a4-student-id">65010984</strong></td>
+            </tr>
+            <tr>
+              <td class="label">กลุ่มทดลอง:</td>
+              <td class="val" id="a4-group">กลุ่มที่ 3</td>
+              <td class="label">อาจารย์ผู้ตรวจ:</td>
+              <td class="val" id="a4-instructor">ผศ. ดร. สมชาย วิทยาการ</td>
+            </tr>
+            <tr>
+              <td class="label">วันที่ทำทดลอง:</td>
+              <td class="val" id="a4-date">2026-08-15</td>
+              <td class="label">สถานที่:</td>
+              <td class="val" id="a4-location">ห้องปฏิบัติการ EE-302</td>
+            </tr>
+          </table>
+
+          <!-- Section 1: Objective & Theory -->
+          <div class="a4-section">
+            <div class="a4-sec-title">1. วัตถุประสงค์และทฤษฎีการทดลอง</div>
+            <div style="margin-bottom:6px;">
+              <strong>วัตถุประสงค์:</strong>
+              <div id="a4-objective" class="a4-text"></div>
+            </div>
+            <div>
+              <strong>ทฤษฎีและหลักการ:</strong>
+              <div id="a4-theory" class="a4-text"></div>
+            </div>
+          </div>
+
+          <!-- Section 2: Equipment -->
+          <div class="a4-section">
+            <div class="a4-sec-title">2. รายการอุปกรณ์และเครื่องมือวัด</div>
+            <div id="a4-equip-list" class="a4-equip-list"></div>
+          </div>
+
+          <!-- Section 3: Procedures -->
+          <div class="a4-section">
+            <div class="a4-sec-title">3. ขั้นตอนและวิธีการทดลอง</div>
+            <div id="a4-steps-list"></div>
+          </div>
+
+          <!-- Section 4: Data Table -->
+          <div class="a4-section">
+            <div class="a4-sec-title">4. ตารางบันทึกผลการทดลอง</div>
+            <div id="a4-table-container"></div>
+          </div>
+
+          <!-- Section 5: Conclusion -->
+          <div class="a4-section">
+            <div class="a4-sec-title">5. สรุปและวิเคราะห์ผลการทดลอง</div>
+            <div id="a4-conclusion" class="a4-text"></div>
+          </div>
+
+          <!-- Signatures Block -->
+          <div class="a4-signature-grid">
+            <div>
+              <div class="signature-line"></div>
+              <div>ลงชื่อ..........................................................</div>
+              <div>( <span id="a4-sign-student">นาย ภานุวัฒน์ รัตนเดชวิบูลย์</span> )</div>
+              <div style="color:#64748b; font-size:8pt;">ผู้รายงานการทดลอง</div>
+            </div>
+
+            <div>
+              <div class="signature-line"></div>
+              <div>ลงชื่อ..........................................................</div>
+              <div>( <span id="a4-sign-instructor">ผศ. ดร. สมชาย วิทยาการ</span> )</div>
+              <div style="color:#64748b; font-size:8pt;">อาจารย์ผู้ควบคุม / ผู้ประเมินผล</div>
+            </div>
+          </div>
+
+          <!-- Document Footer -->
+          <div class="a4-footer">
+            <span>รายงานผลการทดลองทางวิศวกรรม - แบบฟอร์มมาตรฐาน</span>
+            <span>หน้า 1 จาก 1</span>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- CDN Libraries -->
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- html2pdf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- Application Scripts -->
+  <script src="js/sample-data.js"></script>
+  <script src="js/qrcode-helper.js"></script>
+  <script src="js/pdf-export.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
