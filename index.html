@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engineering Lab Portfolio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+
+<body>
+
+    <!-- ================= 1. ส่วนแผงควบคุม (Admin Form) ================= -->
+    <div id="admin-view" class="container no-print">
+        <header class="muji-header">
+            <h1>บันทึกข้อมูล Lab ใหม่</h1>
+            <p>ระบบจัดการ Portfolio ส่วนตัว</p>
+        </header>
+
+        <form id="labForm" class="muji-form">
+            <div class="form-group">
+                <label>หัวข้อการทดลอง</label>
+                <input type="text" id="labTitle" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ชื่อ-นามสกุล</label>
+                    <input type="text" id="studentName" value="Pemika Kayadee">
+                </div>
+                <div class="form-group">
+                    <label>รหัสนักศึกษา (แสดงในเอกสาร)</label>
+                    <input type="text" id="studentId">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>คณะและสาขา</label>
+                    <input type="text" id="faculty">
+                </div>
+                <div class="form-group">
+                    <label>มหาวิทยาลัย</label>
+                    <input type="text" id="university" value="มหาวิทยาลัยธุรกิจบัณฑิตย์">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>กลุ่มเรียน (แสดงในเอกสาร)</label>
+                    <input type="text" id="studyGroup">
+                </div>
+                <div class="form-group">
+                    <label>วิชาเรียน (แสดงในเอกสาร)</label>
+                    <input type="text" id="subject">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>วัตถุประสงค์ (แสดงบนเว็บ + เอกสาร)</label>
+                <textarea id="objective" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>ทฤษฎีที่ใช้ (แสดงบนเว็บ)</label>
+                <textarea id="theory" rows="3"></textarea>
+            </div>
+
+            <!-- สามารถเพิ่มช่อง อุปกรณ์, ขั้นตอน, สรุปผล ต่อได้ที่นี่ -->
+
+            <div class="button-group">
+                <button type="button" class="btn-primary" onclick="generatePreview()">สร้าง Preview</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ================= 2. ส่วนแสดงผลบนเว็บไซต์ (Public Web View) ================= -->
+    <div id="web-showcase-view" class="container hidden no-print">
+        <nav class="muji-nav">
+            <button onclick="backToForm()" class="btn-secondary">กลับไปแก้ไข</button>
+            <button onclick="showPrintView()" class="btn-primary">เตรียมพิมพ์ PDF</button>
+        </nav>
+
+        <div class="portfolio-card">
+            <h1 id="web-title" class="lab-title"></h1>
+            <p class="author-info">โดย <span id="web-name"></span> | <span id="web-faculty"></span> | <span
+                    id="web-uni"></span></p>
+
+            <section class="content-section">
+                <h3>วัตถุประสงค์</h3>
+                <p id="web-objective"></p>
+            </section>
+
+            <section class="content-section">
+                <h3>ทฤษฎีที่ใช้</h3>
+                <p id="web-theory"></p>
+            </section>
+
+            <!-- ส่วนอื่นๆ สำหรับเว็บจะแสดงที่นี่ -->
+        </div>
+    </div>
+
+    <!-- ================= 3. ส่วนสำหรับพิมพ์ (Print Document View) ================= -->
+    <div id="print-document-view" class="page-a4 hidden">
+        <!-- ปุ่มโหลดจะซ่อนอัตโนมัติเวลาปริ้นจริง -->
+        <div class="no-print print-actions">
+            <button onclick="backToWeb()" class="btn-secondary">กลับหน้าเว็บ</button>
+            <button onclick="downloadPDF()" class="btn-primary">ดาวน์โหลด PDF</button>
+        </div>
+
+        <div class="document-content">
+            <div class="doc-header">
+                <h2>รายงานการทดลองวิศวกรรม</h2>
+                <div id="qrcode" class="qr-container"></div>
+            </div>
+
+            <h3 id="doc-title" class="doc-title"></h3>
+
+            <table class="info-table">
+                <tr>
+                    <th>ชื่อ-สกุล:</th>
+                    <td id="doc-name"></td>
+                    <th>รหัสนักศึกษา:</th>
+                    <td id="doc-id"></td>
+                </tr>
+                <tr>
+                    <th>คณะ/สาขา:</th>
+                    <td id="doc-faculty"></td>
+                    <th>มหาวิทยาลัย:</th>
+                    <td id="doc-uni"></td>
+                </tr>
+                <tr>
+                    <th>วิชาเรียน:</th>
+                    <td id="doc-subject"></td>
+                    <th>กลุ่มเรียน:</th>
+                    <td id="doc-group"></td>
+                </tr>
+            </table>
+
+            <div class="doc-section">
+                <h4>1. วัตถุประสงค์</h4>
+                <p id="doc-objective"></p>
+            </div>
+
+            <!-- พื้นที่สำหรับ Flowchart และส่วนอื่นๆ ของเอกสาร -->
+            <div class="doc-section">
+                <h4>2. Flowchart ขั้นตอนการทดลอง</h4>
+                <div class="flowchart-placeholder">[พื้นที่ใส่รูป Flowchart]</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/qrcode-helper.js"></script>
+    <script src="js/pdf-export.js"></script>
+</body>
+
+</html>
