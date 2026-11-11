@@ -1,182 +1,65 @@
-/* Muji Style Color Palette & Reset */
 :root {
-    --bg-color: #f9f8f6;
-    --text-main: #4a4a4a;
-    --text-light: #7a7a7a;
-    --border-color: #e2dfd8;
-    --accent-color: #a89f91;
-    --white: #ffffff;
+    --muji-bg: #f9f8f6;
+    --muji-surface: #ffffff;
+    --muji-text: #333333;
+    --muji-gray: #767676;
+    --muji-border: #e6e6e6;
+    --muji-btn: #8c8a86;
+    --muji-btn-hover: #73716d;
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Sarabun', sans-serif; background: var(--muji-bg); color: var(--muji-text); }
 
-body {
-    background-color: var(--bg-color);
-    color: var(--text-main);
-    font-family: 'Prompt', sans-serif;
-    line-height: 1.6;
-}
+.hidden { display: none !important; }
+.view-section { padding: 40px 20px; max-width: 800px; margin: 0 auto; }
 
-/* Containers */
-.container {
-    max-width: 800px;
-    margin: 40px auto;
-    background: var(--white);
-    padding: 40px;
-    border-radius: 4px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-    border: 1px solid var(--border-color);
+/* Cards & Forms */
+.muji-card {
+    background: var(--muji-surface); padding: 40px; border-radius: 4px;
+    border: 1px solid var(--muji-border); box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
-
-.hidden {
-    display: none !important;
+.form-group { margin-bottom: 24px; }
+label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.95rem; }
+input[type="text"], input[type="email"], input[type="password"], select, textarea {
+    width: 100%; padding: 12px; border: 1px solid var(--muji-border);
+    border-radius: 2px; font-family: 'Sarabun', sans-serif; background: #fafafa;
 }
-
-/* Typography & Forms */
-h1,
-h2,
-h3,
-h4 {
-    font-weight: 500;
-    color: var(--text-main);
-    margin-bottom: 15px;
-}
-
-.muji-header {
-    text-align: center;
-    margin-bottom: 30px;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 20px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-row {
-    display: flex;
-    gap: 20px;
-}
-
-.form-row .form-group {
-    flex: 1;
-}
-
-label {
-    display: block;
-    font-size: 0.9rem;
-    color: var(--text-light);
-    margin-bottom: 5px;
-}
-
-input[type="text"],
-textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 2px;
-    background-color: #fcfcfc;
-    font-family: 'Prompt', sans-serif;
-    transition: border-color 0.3s;
-}
-
-input[type="text"]:focus,
-textarea:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    background-color: var(--white);
-}
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--muji-btn); background: var(--muji-surface); }
 
 /* Buttons */
-button {
-    padding: 10px 24px;
-    border: none;
-    border-radius: 2px;
-    font-family: 'Prompt', sans-serif;
-    cursor: pointer;
-    transition: opacity 0.2s;
-}
+button { padding: 10px 20px; border: none; border-radius: 2px; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: 0.2s; }
+.btn-primary { background: var(--muji-btn); color: white; }
+.btn-primary:hover { background: var(--muji-btn-hover); }
+.btn-secondary { background: transparent; border: 1px solid var(--muji-border); color: var(--muji-text); }
+.btn-text { background: transparent; color: var(--muji-gray); padding: 5px 0; font-size: 0.9rem; }
+.flex-row { display: flex; gap: 10px; }
 
-button:hover {
-    opacity: 0.8;
+/* Flowchart */
+.flowchart-editor { text-align: center; background: #fafafa; padding: 20px; border: 1px solid var(--muji-border); }
+.flowchart-box {
+    border: 2px solid var(--muji-btn); background: white; padding: 10px 20px;
+    display: inline-block; border-radius: 4px; min-width: 150px; font-weight: 500;
 }
+.end-box { border-radius: 20px; }
+.flow-arrow { margin: 5px 0; color: var(--muji-gray); }
+.btn-add-flow { width: 30px; height: 30px; border-radius: 15px; border: 1px dashed var(--muji-gray); background: white; }
 
-.btn-primary {
-    background-color: var(--accent-color);
-    color: var(--white);
-}
+/* Portfolio Header */
+.portfolio-header { text-align: center; margin-bottom: 40px; }
+.profile-img { width: 120px; height: 120px; border-radius: 60px; object-fit: cover; margin-bottom: 15px; background: #e0e0e0; }
 
-.btn-secondary {
-    background-color: transparent;
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-}
-
-.button-group,
-.muji-nav,
-.print-actions {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 20px;
-    margin-bottom: 20px;
-}
-
-/* A4 Document Setup */
+/* PDF A4 Document */
 .page-a4 {
-    background: white;
-    width: 210mm;
-    min-height: 297mm;
-    margin: 20px auto;
-    padding: 20mm;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    background: white; width: 210mm; min-height: 297mm; margin: 0 auto;
+    padding: 20mm; box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
-
-.doc-header {
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 2px solid var(--text-main);
-    padding-bottom: 15px;
-    margin-bottom: 20px;
-}
-
-.info-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-    font-size: 0.9rem;
-}
-
-.info-table th,
-.info-table td {
-    border: 1px solid var(--border-color);
-    padding: 8px;
-    text-align: left;
-}
-
-.info-table th {
-    background-color: var(--bg-color);
-    width: 20%;
-}
+.pdf-header { display: flex; justify-content: space-between; border-bottom: 2px solid var(--muji-text); padding-bottom: 15px; margin-bottom: 20px; }
+.qr-container { width: 80px; height: 80px; }
 
 @media print {
-    body {
-        background: white;
-        margin: 0;
-    }
-
-    .no-print {
-        display: none !important;
-    }
-
-    .page-a4 {
-        box-shadow: none;
-        margin: 0;
-        padding: 0;
-        width: 100%;
-    }
+    body { background: white; }
+    .no-print { display: none !important; }
+    .view-section { padding: 0; max-width: none; }
+    .page-a4 { width: 100%; box-shadow: none; margin: 0; padding: 0; }
 }
