@@ -160,7 +160,7 @@ export function mergeLabs(cloudMap = {}, localMap = {}) {
  * @param {number} quality
  * @returns {Promise<string>}
  */
-export function compressImageToDataUrl(file, maxSize = 800, quality = 0.78) {
+export function compressImageToDataUrl(file, maxSize = 600, quality = 0.72) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์รูปภาพได้'));

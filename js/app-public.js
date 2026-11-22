@@ -245,7 +245,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     let cloudError = null;
 
     try {
-        const querySnapshot = await withTimeout(getDocs(collection(db, 'labs')), 6000);
+        const querySnapshot = await withTimeout(getDocs(collection(db, 'labs')), 12000);
         querySnapshot.forEach((docSnap) => {
             cloudLabs[docSnap.id] = docSnap.data();
         });
@@ -265,8 +265,9 @@ window.addEventListener('DOMContentLoaded', async () => {
         });
 
     if (labs.length === 0 && cloudError) {
+        const errCode = escapeHtml(cloudError?.code || 'network');
         container.innerHTML =
-            '<p class="alert-error text-center">ไม่สามารถเชื่อมต่อฐานข้อมูล Firebase ได้ในขณะนี้ และยังไม่มีข้อมูลที่บันทึกไว้ในเครื่อง</p>';
+            `<p class="alert-error text-center">ไม่สามารถดึงข้อมูลจาก Firebase ได้ในขณะนี้ (${errCode}) — กรุณาตรวจสอบการตั้งค่า Firestore Security Rules ให้เปิดสิทธิ์อ่านสาธารณะ</p>`;
         return;
     }
 

@@ -256,7 +256,7 @@ async function handleImageFiles(files) {
     for (const file of imageFiles) {
         if (uploadedImages.length >= MAX_IMAGES) break;
         try {
-            const compressedDataUrl = await compressImageToDataUrl(file, 1024, 0.75);
+            const compressedDataUrl = await compressImageToDataUrl(file, 600, 0.72);
             uploadedImages.push(compressedDataUrl);
             renderImagePreview();
         } catch (err) {
@@ -382,22 +382,38 @@ async function saveLabNow(showBanner = false) {
 
     setSaveStatus('(กำลังบันทึกขึ้น Cloud...)');
     try {
-        await withTimeout(setDoc(doc(db, 'labs', currentLabId), labData, { merge: true }), 6000);
-        setSaveStatus('(บันทึกแล้ว)');
+        // ตรวจสอบขนาดเอกสารไม่ให้เกินลิมิต 1 MiB ของ Firestore
+        const approxBytes = new Blob([JSON.stringify(labData)]).size;
+        if (approxBytes > 950000) {
+            throw Object.assign(new Error('ขนาดรูปภาพรวมใหญ่เกิน 1 MB'), { code: 'document-too-large' });
+        }
+
+        await withTimeout(setDoc(doc(db, 'labs', currentLabId), labData, { merge: true }), 15000);
+        setSaveStatus('(บันทึกขึ้น Cloud แล้ว)');
         if (showBanner) {
-            showActionFeedback('บันทึกข้อมูลเรียบร้อยแล้ว (ซิงก์ขึ้น Firebase และพร้อมแสดงบนหน้าเว็บไซต์สาธารณะ)', 'success');
+            showActionFeedback(
+                'บันทึกข้อมูลขึ้น Firebase Cloud เรียบร้อยแล้ว — ทุกคนที่เข้าเว็บ (รวมถึงมือถือ) สามารถเห็นข้อมูลนี้ได้ทันที',
+                'success'
+            );
         }
         return true;
     } catch (err) {
         console.error('Firestore save failed:', err);
-        const reason = err?.code || err?.message || 'unknown';
-        setSaveStatus(`(บันทึกในเครื่องแล้ว / Cloud ผิดพลาด: ${reason})`, true);
-        if (showBanner) {
-            showActionFeedback(
-                `บันทึกข้อมูลไว้ในเครื่องเรียบร้อย (หน้าเว็บสาธารณะจะแสดงข้อมูลนี้แล้ว) แต่ส่งขึ้น Firebase ไม่สำเร็จ (${reason}) — กรุณาตรวจสอบว่าสร้าง Firestore Database และตั้งค่า Security Rules แล้ว`,
-                'warning'
-            );
+        const code = err?.code || 'unknown';
+        let hint = 'กรุณาตรวจสอบว่าสร้าง Firestore Database และตั้งค่า Security Rules แล้ว';
+        if (code === 'permission-denied') {
+            hint = 'สิทธิ์ถูกปฏิเสธ — กรุณาไปตั้งค่า Firestore Rules เป็น allow read: if true; allow write: if request.auth != null;';
+        } else if (code === 'document-too-large') {
+            hint = 'ขนาดรูปภาพรวมใหญ่เกินลิมิต 1 MB ของ Firestore — กรุณาลบรูปเก่าแล้วอัปโหลดใหม่อีกครั้ง';
+        } else if (code === 'timeout' || code === 'unavailable') {
+            hint = 'ไม่สามารถติดต่อ Firestore ได้ — กรุณาตรวจสอบว่าได้กด Create database ในเมนู Firestore Database ของ Firebase Console แล้ว';
         }
+
+        setSaveStatus(`(บันทึกเฉพาะในเครื่อง / Cloud ผิดพลาด: ${code})`, true);
+        showActionFeedback(
+            `บันทึกเฉพาะในเครื่องนี้เท่านั้น (เครื่องอื่นจะยังไม่เห็น) เพราะส่งขึ้น Firebase ไม่สำเร็จ [${code}]: ${hint}`,
+            'warning'
+        );
         return false;
     }
 }
@@ -452,7 +468,7 @@ async function loadExistingLabs() {
     const localLabs = getLocalLabs();
     let cloudLabs = {};
     try {
-        const snapshot = await withTimeout(getDocs(collection(db, 'labs')), 6000);
+        const snapshot = await withTimeout(getDocs(collection(db, 'labs')), 12000);
         snapshot.forEach((docSnap) => {
             cloudLabs[docSnap.id] = docSnap.data();
         });
