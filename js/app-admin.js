@@ -1,0 +1,682 @@
+import {
+    auth,
+    db,
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    signOut,
+    collection,
+    doc,
+    setDoc,
+    getDocs,
+    deleteDoc
+} from './firebase-config.js';
+import {
+    compressImageToDataUrl,
+    isSafeImageUrl,
+    withTimeout,
+    getLocalLabs,
+    saveLocalLab,
+    deleteLocalLab,
+    mergeLabs
+} from './utils.js';
+import { renderPdfPreview, downloadLabPdf } from './pdf-export.js';
+import { SAMPLE_LAB_DATA } from './sample-data.js';
+
+const MAX_IMAGES = 3;
+
+let currentLabId = generateNewLabId();
+let savedLabsMap = {};
+let uploadedImages = [];
+let flowStepCount = 0;
+let saveTimeout = null;
+let isPopulatingForm = false;
+
+function generateNewLabId() {
+    return `lab_${Date.now()}`;
+}
+
+function switchView(viewId) {
+    document.querySelectorAll('.view-section').forEach((el) => el.classList.add('hidden'));
+    const target = document.getElementById(viewId);
+    if (target) {
+        target.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+function setSaveStatus(text, isError = false) {
+    const statusEl = document.getElementById('save-status');
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.classList.toggle('save-status-error', isError);
+}
+
+function showActionFeedback(message, type = 'success') {
+    const banner = document.getElementById('action-feedback');
+    if (!banner) return;
+    banner.textContent = message;
+    banner.className = `feedback-banner feedback-${type}`;
+}
+
+// ==========================================
+// 1. จัดการรายการในฟอร์ม (Dynamic Fields)
+// ==========================================
+function addListItem(containerId, placeholder, value = '') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'flex-row mb-10';
+
+    const bullet = document.createElement('span');
+    bullet.className = 'list-bullet';
+    bullet.textContent = '○';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'auto-save flex-1';
+    input.placeholder = `${placeholder} ${container.children.length + 1}`;
+    input.value = value;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-secondary btn-sm';
+    removeBtn.textContent = '-';
+    removeBtn.setAttribute('aria-label', 'ลบรายการ');
+    removeBtn.addEventListener('click', () => {
+        row.remove();
+        scheduleAutoSave();
+    });
+
+    row.append(bullet, input, removeBtn);
+    container.appendChild(row);
+}
+
+function addProblemPair(issue = '', solution = '') {
+    const container = document.getElementById('problemList');
+    if (!container) return;
+
+    const num = container.children.length + 1;
+    const card = document.createElement('div');
+    card.className = 'problem-card';
+
+    const issueRow = document.createElement('div');
+    issueRow.className = 'flex-row mb-10';
+    const issueBullet = document.createElement('span');
+    issueBullet.className = 'list-bullet';
+    issueBullet.textContent = '○';
+    const issueInput = document.createElement('input');
+    issueInput.type = 'text';
+    issueInput.className = 'auto-save flex-1 problem-issue';
+    issueInput.placeholder = `ปัญหาที่พบ ${num}`;
+    issueInput.value = issue;
+    issueRow.append(issueBullet, issueInput);
+
+    const solRow = document.createElement('div');
+    solRow.className = 'flex-row';
+    const solBullet = document.createElement('span');
+    solBullet.className = 'list-bullet';
+    solBullet.textContent = '○';
+    const solInput = document.createElement('input');
+    solInput.type = 'text';
+    solInput.className = 'auto-save flex-1 problem-solution';
+    solInput.placeholder = `แนวทางการแก้ไข ${num}`;
+    solInput.value = solution;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-secondary btn-sm';
+    removeBtn.textContent = 'ลบ';
+    removeBtn.addEventListener('click', () => {
+        card.remove();
+        scheduleAutoSave();
+    });
+
+    solRow.append(solBullet, solInput, removeBtn);
+    card.append(issueRow, solRow);
+    container.appendChild(card);
+}
+
+function addFlowchartStep(value = '') {
+    const container = document.getElementById('flowchartSteps');
+    if (!container) return;
+
+    flowStepCount += 1;
+    const stepDiv = document.createElement('div');
+    stepDiv.id = `flow-step-${flowStepCount}`;
+    stepDiv.className = 'flowchart-step-item';
+
+    const box = document.createElement('div');
+    box.className = 'flow-box';
+
+    const label = document.createElement('div');
+    label.textContent = `ขั้นตอนที่ ${flowStepCount}`;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'w-100 mt-10 auto-save';
+    input.placeholder = 'รายละเอียดขั้นตอน...';
+    input.value = value;
+
+    const arrow = document.createElement('div');
+    arrow.className = 'flow-connector flow-connector-admin';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.innerHTML = '<span class="flow-connector-stem"></span><span class="flow-connector-head"></span>';
+
+    box.append(label, input);
+    stepDiv.append(box, arrow);
+    container.appendChild(stepDiv);
+}
+
+function removeFlowchartStep() {
+    if (flowStepCount <= 1) return;
+    const stepEl = document.getElementById(`flow-step-${flowStepCount}`);
+    if (stepEl) {
+        stepEl.remove();
+        flowStepCount -= 1;
+        scheduleAutoSave();
+    }
+}
+
+function ensureAdvisorOption(advisorName) {
+    const select = document.getElementById('advisorSelect');
+    if (!select || !advisorName) return;
+
+    const exists = Array.from(select.options).some((opt) => opt.value === advisorName);
+    if (!exists) {
+        const option = document.createElement('option');
+        option.value = advisorName;
+        option.textContent = advisorName;
+        select.add(option);
+    }
+}
+
+function handleAddAdvisor() {
+    const input = document.getElementById('newAdvisor');
+    const select = document.getElementById('advisorSelect');
+    if (!input || !select) return;
+
+    const name = input.value.trim();
+    if (!name) return;
+
+    ensureAdvisorOption(name);
+    select.value = name;
+    input.value = '';
+    scheduleAutoSave();
+}
+
+// ==========================================
+// 2. จัดการรูปภาพ (สูงสุด 3 ภาพ + บีบอัด)
+// ==========================================
+function renderImagePreview() {
+    const container = document.getElementById('imagePreview');
+    if (!container) return;
+    container.innerHTML = '';
+
+    uploadedImages.forEach((imgSrc, index) => {
+        if (!isSafeImageUrl(imgSrc)) return;
+
+        const item = document.createElement('div');
+        item.className = 'img-preview-item';
+
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = `ภาพประกอบที่ ${index + 1}`;
+        img.className = 'img-thumb';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'img-remove-btn';
+        removeBtn.textContent = '✕';
+        removeBtn.setAttribute('aria-label', `ลบรูปภาพที่ ${index + 1}`);
+        removeBtn.addEventListener('click', () => {
+            uploadedImages.splice(index, 1);
+            renderImagePreview();
+            scheduleAutoSave();
+        });
+
+        item.append(img, removeBtn);
+        container.appendChild(item);
+    });
+}
+
+async function handleImageFiles(files) {
+    const imageFiles = files.filter((file) => file.type && file.type.startsWith('image/'));
+    if (imageFiles.length !== files.length) {
+        alert('กรุณาเลือกเฉพาะไฟล์รูปภาพเท่านั้น');
+    }
+    if (imageFiles.length === 0) return;
+
+    if (uploadedImages.length + imageFiles.length > MAX_IMAGES) {
+        alert(`สามารถอัปโหลดภาพประกอบได้สูงสุด ${MAX_IMAGES} ภาพเท่านั้น`);
+        return;
+    }
+
+    setSaveStatus('(กำลังประมวลผลรูปภาพ...)');
+    for (const file of imageFiles) {
+        if (uploadedImages.length >= MAX_IMAGES) break;
+        try {
+            const compressedDataUrl = await compressImageToDataUrl(file, 1024, 0.75);
+            uploadedImages.push(compressedDataUrl);
+            renderImagePreview();
+        } catch (err) {
+            console.error('Image processing failed:', err);
+            alert(`ไม่สามารถประมวลผลไฟล์ ${file.name} ได้`);
+        }
+    }
+
+    scheduleAutoSave();
+}
+
+// ==========================================
+// 3. รวบรวมข้อมูล / โหลดข้อมูล / บันทึก (Local + Cloud)
+// ==========================================
+function collectFormData() {
+    const getListValues = (containerId) =>
+        Array.from(document.querySelectorAll(`#${containerId} input`))
+            .map((input) => input.value.trim())
+            .filter(Boolean);
+
+    const problems = [];
+    const problemCards = document.querySelectorAll('#problemList .problem-card');
+    problemCards.forEach((card) => {
+        const issue = card.querySelector('.problem-issue')?.value.trim() || '';
+        const solution = card.querySelector('.problem-solution')?.value.trim() || '';
+        if (issue || solution) {
+            problems.push({ issue, solution });
+        }
+    });
+
+    const flowSteps = Array.from(document.querySelectorAll('#flowchartSteps input'))
+        .map((input) => input.value.trim())
+        .filter(Boolean);
+
+    return {
+        title: document.getElementById('labTitle')?.value.trim() || '',
+        advisor: document.getElementById('advisorSelect')?.value.trim() || '',
+        responsibility: document.getElementById('responsibility')?.value.trim() || '',
+        objectives: getListValues('objectiveList'),
+        equipments: getListValues('equipmentList'),
+        problems,
+        summary: document.getElementById('labSummary')?.value.trim() || '',
+        flowSteps,
+        images: [...uploadedImages],
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function populateForm(data = {}) {
+    isPopulatingForm = true;
+    clearTimeout(saveTimeout);
+
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val || '';
+    };
+
+    setVal('labTitle', data.title);
+    if (data.advisor) ensureAdvisorOption(data.advisor);
+    setVal('advisorSelect', data.advisor);
+    setVal('responsibility', data.responsibility);
+    setVal('labSummary', data.summary);
+
+    const objContainer = document.getElementById('objectiveList');
+    if (objContainer) {
+        objContainer.innerHTML = '';
+        const objectives = Array.isArray(data.objectives) && data.objectives.length ? data.objectives : [''];
+        objectives.forEach((item) => addListItem('objectiveList', 'วัตถุประสงค์ข้อที่', item));
+    }
+
+    const eqContainer = document.getElementById('equipmentList');
+    if (eqContainer) {
+        eqContainer.innerHTML = '';
+        const equipments = Array.isArray(data.equipments) && data.equipments.length ? data.equipments : [''];
+        equipments.forEach((item) => addListItem('equipmentList', 'อุปกรณ์ชิ้นที่', item));
+    }
+
+    const probContainer = document.getElementById('problemList');
+    if (probContainer) {
+        probContainer.innerHTML = '';
+        const problems =
+            Array.isArray(data.problems) && data.problems.length ? data.problems : [{ issue: '', solution: '' }];
+        problems.forEach((p) => addProblemPair(p.issue || '', p.solution || ''));
+    }
+
+    const flowContainer = document.getElementById('flowchartSteps');
+    if (flowContainer) {
+        flowContainer.innerHTML = '';
+        flowStepCount = 0;
+        const steps = Array.isArray(data.flowSteps) && data.flowSteps.length ? data.flowSteps : [''];
+        steps.forEach((step) => addFlowchartStep(step));
+    }
+
+    uploadedImages = Array.isArray(data.images) ? data.images.filter(isSafeImageUrl).slice(0, MAX_IMAGES) : [];
+    renderImagePreview();
+
+    isPopulatingForm = false;
+}
+
+/**
+ * บันทึกข้อมูลลงทั้ง localStorage (ทันที) และ Firestore (พร้อม timeout)
+ * @param {boolean} showBanner
+ */
+async function saveLabNow(showBanner = false) {
+    clearTimeout(saveTimeout);
+    const labData = collectFormData();
+
+    // 1. บันทึกลง localStorage ทันที เพื่อให้หน้าสาธารณะแสดงผลได้เสมอแม้ Firestore ช้า/มีปัญหา
+    saveLocalLab(currentLabId, labData);
+    savedLabsMap[currentLabId] = labData;
+    renderLabSelector();
+
+    if (!auth.currentUser) {
+        setSaveStatus('(บันทึกในเครื่องแล้ว - ยังไม่ได้เข้าสู่ระบบ Firebase)', true);
+        if (showBanner) {
+            showActionFeedback(
+                'บันทึกข้อมูลไว้ในเครื่องแล้ว แต่ยังไม่ได้เข้าสู่ระบบ Firebase จึงยังไม่ได้ซิงก์ขึ้น Cloud',
+                'warning'
+            );
+        }
+        return false;
+    }
+
+    setSaveStatus('(กำลังบันทึกขึ้น Cloud...)');
+    try {
+        await withTimeout(setDoc(doc(db, 'labs', currentLabId), labData, { merge: true }), 6000);
+        setSaveStatus('(บันทึกแล้ว)');
+        if (showBanner) {
+            showActionFeedback('บันทึกข้อมูลเรียบร้อยแล้ว (ซิงก์ขึ้น Firebase และพร้อมแสดงบนหน้าเว็บไซต์สาธารณะ)', 'success');
+        }
+        return true;
+    } catch (err) {
+        console.error('Firestore save failed:', err);
+        const reason = err?.code || err?.message || 'unknown';
+        setSaveStatus(`(บันทึกในเครื่องแล้ว / Cloud ผิดพลาด: ${reason})`, true);
+        if (showBanner) {
+            showActionFeedback(
+                `บันทึกข้อมูลไว้ในเครื่องเรียบร้อย (หน้าเว็บสาธารณะจะแสดงข้อมูลนี้แล้ว) แต่ส่งขึ้น Firebase ไม่สำเร็จ (${reason}) — กรุณาตรวจสอบว่าสร้าง Firestore Database และตั้งค่า Security Rules แล้ว`,
+                'warning'
+            );
+        }
+        return false;
+    }
+}
+
+function scheduleAutoSave() {
+    if (isPopulatingForm) return;
+    setSaveStatus('(กำลังบันทึก...)');
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+        saveLabNow(false);
+    }, 1000);
+}
+
+// ==========================================
+// 4. จัดการรายการ Lab ที่บันทึกไว้
+// ==========================================
+function renderLabSelector() {
+    const selector = document.getElementById('labSelector');
+    const deleteBtn = document.getElementById('btnDeleteLab');
+    if (!selector) return;
+
+    const entries = Object.entries(savedLabsMap).sort(([, a], [, b]) => {
+        const timeA = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const timeB = b?.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
+    });
+
+    selector.innerHTML = '';
+    const newOpt = document.createElement('option');
+    newOpt.value = '';
+    newOpt.textContent = '-- สร้างปฏิบัติการใหม่ --';
+    selector.appendChild(newOpt);
+
+    entries.forEach(([id, data]) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = data?.title || `(ไม่มีชื่อหัวข้อ - ${id})`;
+        selector.appendChild(opt);
+        if (data?.advisor) ensureAdvisorOption(data.advisor);
+    });
+
+    if (savedLabsMap[currentLabId]) {
+        selector.value = currentLabId;
+        if (deleteBtn) deleteBtn.classList.remove('hidden');
+    } else {
+        selector.value = '';
+        if (deleteBtn) deleteBtn.classList.add('hidden');
+    }
+}
+
+async function loadExistingLabs() {
+    const localLabs = getLocalLabs();
+    let cloudLabs = {};
+    try {
+        const snapshot = await withTimeout(getDocs(collection(db, 'labs')), 6000);
+        snapshot.forEach((docSnap) => {
+            cloudLabs[docSnap.id] = docSnap.data();
+        });
+    } catch (err) {
+        console.warn('Failed to load existing labs from Firestore, using local cache:', err);
+    }
+    savedLabsMap = mergeLabs(cloudLabs, localLabs);
+    renderLabSelector();
+}
+
+function startNewLab() {
+    currentLabId = generateNewLabId();
+    populateForm({});
+    renderLabSelector();
+    setSaveStatus('พร้อมสร้างปฏิบัติการใหม่');
+    const banner = document.getElementById('action-feedback');
+    if (banner) banner.classList.add('hidden');
+}
+
+async function deleteCurrentLab() {
+    if (!savedLabsMap[currentLabId]) return;
+    const confirmed = window.confirm('ต้องการลบปฏิบัติการนี้ออกจากระบบถาวรหรือไม่?');
+    if (!confirmed) return;
+
+    deleteLocalLab(currentLabId);
+    delete savedLabsMap[currentLabId];
+
+    try {
+        if (auth.currentUser) {
+            await withTimeout(deleteDoc(doc(db, 'labs', currentLabId)), 6000);
+        }
+        startNewLab();
+        setSaveStatus('(ลบข้อมูลเรียบร้อยแล้ว)');
+    } catch (err) {
+        console.error('Cloud delete failed:', err);
+        startNewLab();
+        setSaveStatus('(ลบจากเครื่องแล้ว แต่ลบจาก Cloud ไม่สำเร็จ)', true);
+    }
+}
+
+async function triggerDownloadPdf(triggerBtn) {
+    const pagesContainer = document.getElementById('pdf-pages-container');
+    const title = document.getElementById('labTitle')?.value || 'Portfolio';
+    const originalText = triggerBtn?.textContent || 'Download PDF';
+
+    if (triggerBtn) {
+        triggerBtn.disabled = true;
+        triggerBtn.textContent = 'กำลังสร้างไฟล์ PDF...';
+    }
+    try {
+        await downloadLabPdf(pagesContainer, title);
+    } finally {
+        if (triggerBtn) {
+            triggerBtn.disabled = false;
+            triggerBtn.textContent = originalText;
+        }
+    }
+}
+
+// ==========================================
+// 5. ผูก Events และจัดการ Auth State
+// ==========================================
+function bindEvents() {
+    const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
+    const btnLogin = document.getElementById('btnLogin');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('adminEmail')?.value.trim() || '';
+            const password = document.getElementById('adminPassword')?.value || '';
+
+            if (loginError) loginError.classList.add('hidden');
+            if (btnLogin) {
+                btnLogin.disabled = true;
+                btnLogin.textContent = 'กำลังเข้าสู่ระบบ...';
+            }
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                console.error('Login error:', error);
+                if (loginError) {
+                    loginError.textContent = 'เข้าสู่ระบบล้มเหลว กรุณาตรวจสอบอีเมลและรหัสผ่าน';
+                    loginError.classList.remove('hidden');
+                }
+            } finally {
+                if (btnLogin) {
+                    btnLogin.disabled = false;
+                    btnLogin.textContent = 'เข้าสู่ระบบ';
+                }
+            }
+        });
+    }
+
+    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+        clearTimeout(saveTimeout);
+        await signOut(auth);
+    });
+
+    document.getElementById('labSelector')?.addEventListener('change', (e) => {
+        const selectedId = e.target.value;
+        if (!selectedId) {
+            startNewLab();
+            return;
+        }
+        currentLabId = selectedId;
+        populateForm(savedLabsMap[selectedId] || {});
+        renderLabSelector();
+        setSaveStatus('โหลดข้อมูลเรียบร้อย');
+    });
+
+    document.getElementById('btnNewLab')?.addEventListener('click', startNewLab);
+    document.getElementById('btnDeleteLab')?.addEventListener('click', deleteCurrentLab);
+    document.getElementById('btnLoadSample')?.addEventListener('click', () => {
+        populateForm(SAMPLE_LAB_DATA);
+        showActionFeedback('กรอกข้อมูลตัวอย่างลงฟอร์มแล้ว สามารถกด "บันทึกข้อมูลทันที" หรือ "สร้างเอกสาร PDF" ได้เลย', 'success');
+        scheduleAutoSave();
+    });
+
+    document.getElementById('btnAddAdvisor')?.addEventListener('click', handleAddAdvisor);
+    document.getElementById('newAdvisor')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddAdvisor();
+        }
+    });
+
+    document.getElementById('btnAddObjective')?.addEventListener('click', () => {
+        addListItem('objectiveList', 'วัตถุประสงค์ข้อที่');
+    });
+    document.getElementById('btnAddEquipment')?.addEventListener('click', () => {
+        addListItem('equipmentList', 'อุปกรณ์ชิ้นที่');
+    });
+    document.getElementById('btnAddProblem')?.addEventListener('click', () => {
+        addProblemPair();
+    });
+    document.getElementById('btnAddFlowStep')?.addEventListener('click', () => {
+        addFlowchartStep();
+    });
+    document.getElementById('btnRemoveFlowStep')?.addEventListener('click', removeFlowchartStep);
+
+    const uploadBox = document.getElementById('uploadBox');
+    const imageUpload = document.getElementById('imageUpload');
+    if (uploadBox && imageUpload) {
+        uploadBox.addEventListener('click', () => imageUpload.click());
+        uploadBox.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                imageUpload.click();
+            }
+        });
+        imageUpload.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = '';
+            await handleImageFiles(files);
+        });
+    }
+
+    document.addEventListener('input', (e) => {
+        if (e.target instanceof HTMLElement && e.target.classList.contains('auto-save')) {
+            scheduleAutoSave();
+        }
+    });
+    document.addEventListener('change', (e) => {
+        if (e.target instanceof HTMLElement && e.target.classList.contains('auto-save')) {
+            scheduleAutoSave();
+        }
+    });
+
+    // ปุ่มบันทึกข้อมูลทันที (แสดงสถานะทันทีบนปุ่มและแถบแจ้งเตือน)
+    const btnSaveNow = document.getElementById('btnSaveNow');
+    btnSaveNow?.addEventListener('click', async () => {
+        btnSaveNow.disabled = true;
+        btnSaveNow.textContent = 'กำลังบันทึก...';
+        try {
+            await saveLabNow(true);
+        } finally {
+            btnSaveNow.disabled = false;
+            btnSaveNow.textContent = 'บันทึกข้อมูลทันที';
+        }
+    });
+
+    // ปุ่มสร้างเอกสาร PDF — เปิดพรีวิวทันทีแล้วจัดหน้าอัตโนมัติโดยไม่รอให้ Firestore ค้าง
+    document.getElementById('btnPreviewPdf')?.addEventListener('click', () => {
+        const labData = collectFormData();
+        switchView('preview-view');
+        renderPdfPreview(
+            labData,
+            document.getElementById('pdf-pages-container'),
+            currentLabId
+        );
+        // บันทึกในเบื้องหลังโดยไม่บล็อกหน้าเอกสาร
+        saveLabNow(false);
+    });
+
+    document.getElementById('btnBackToForm')?.addEventListener('click', () => {
+        switchView('admin-form-view');
+    });
+
+    document.getElementById('btnPrintPdf')?.addEventListener('click', () => {
+        window.print();
+    });
+
+    const btnDownloadTop = document.getElementById('btnDownloadPdfTop');
+    btnDownloadTop?.addEventListener('click', () => triggerDownloadPdf(btnDownloadTop));
+
+    const btnDownloadBottom = document.getElementById('btnDownloadPdf');
+    btnDownloadBottom?.addEventListener('click', () => triggerDownloadPdf(btnDownloadBottom));
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    bindEvents();
+
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            await loadExistingLabs();
+            if (flowStepCount === 0) {
+                populateForm({});
+            }
+            switchView('admin-form-view');
+        } else {
+            switchView('login-view');
+        }
+    });
+});

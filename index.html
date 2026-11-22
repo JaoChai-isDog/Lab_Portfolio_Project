@@ -3,133 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab Portfolio | Pemika</title>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <title>PORTFOLIO | Pemika</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=K2D:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
-    <!-- Firebase SDKs -->
-    <script type="module" src="js/firebase-config.js"></script>
-    <!-- ไลบรารีสร้าง QR Code และ PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script type="module" src="js/app-public.js"></script>
 </head>
 <body>
-
-    <!-- ================= 1. หน้าเข้าสู่ระบบ (สำหรับหน้ากรอกข้อมูล) ================= -->
-    <div id="login-view" class="view-section hidden no-print">
-        <div class="muji-card center-content">
-            <h2>เข้าสู่ระบบ Admin</h2>
-            <input type="email" id="adminEmail" placeholder="อีเมล">
-            <input type="password" id="adminPassword" placeholder="รหัสผ่าน">
-            <button class="btn-primary" id="btnLogin">เข้าสู่ระบบ</button>
-            <button class="btn-secondary" onclick="switchView('portfolio-main-view')">กลับหน้าหลัก Portfolio</button>
-        </div>
-    </div>
-
-    <!-- ================= 2. Portfolio Web หน้าหลัก (Public) ================= -->
-    <div id="portfolio-main-view" class="view-section no-print">
-        <header class="portfolio-header">
-            <!-- ⬇️ ใส่ที่อยู่ไฟล์รูปภาพของคุณตรงนี้ (แทนที่ "images/my-profile.jpg") ⬇️ -->
-            <img src="images/my-profile.jpg" alt="Profile" class="profile-img">
-            <h1>Pemika Kayadee</h1>
-            <p>วิศวกรรมเครื่องกล | มหาวิทยาลัยศรีปทุม</p>
-            <button class="btn-secondary btn-small" onclick="switchView('login-view')">⚙️ จัดการข้อมูล (Admin)</button>
+    <!-- หน้าหลักสาธารณะ (ตามแบบ Wireframe) -->
+    <div id="portfolio-main-view" class="view-section">
+        <header class="center-card profile-header mb-20">
+            <h1 class="portfolio-brand">PORTFOLIO</h1>
+            <img src="images/my-profile.jpg" alt="รูปภาพโปรไฟล์" class="profile-avatar-square">
+            <h2 class="profile-name">Pemika Kayadee</h2>
+            <h2 class="profile-name">เปมิกา ค้ายาดี</h2>
+            <p class="text-light profile-bio">คณะวิศวกรรมศาสตร์ | สาขาวิชาวิศวกรรมเครื่องกล</p>
+            <p class="text-light profile-bio">มหาวิทยาลัยศรีปทุม</p>
         </header>
-        
-        <div class="lab-list" id="lab-list-container">
-            <!-- รายการ Lab จะถูกดึงจากฐานข้อมูลมาแสดงที่นี่ -->
+
+        <div id="public-lab-list" class="public-lab-list">
+            <!-- รายการการ์ดปฏิบัติการแสดงตรงนี้ -->
         </div>
+
+        <footer class="public-footer">
+            <a href="admin.html" class="btn-text">Admin</a>
+        </footer>
     </div>
 
-    <!-- ================= 3. บันทึกข้อมูลปฏิบัติการ (Admin Form) ================= -->
-    <div id="admin-form-view" class="view-section hidden no-print">
-        <div class="muji-card">
-            <h2>บันทึกข้อมูลปฏิบัติการ <span id="save-status" class="save-status">บันทึกอัตโนมัติ...</span></h2>
-            
-            <div class="form-group">
-                <label>หัวข้อปฏิบัติการ</label>
-                <input type="text" id="labTitle" class="auto-save">
-            </div>
+    <!-- หน้ารายละเอียดปฏิบัติการสาธารณะ (ตามแบบ Wireframe) -->
+    <div id="portfolio-detail-view" class="view-section hidden">
+        <div class="muji-card detail-wireframe">
+            <button type="button" id="btnBackToList" class="btn-text mb-10">← กลับไปหน้าหลัก</button>
 
-            <div class="form-group">
-                <label>อาจารย์ที่ปรึกษาประจำปฏิบัติการ</label>
-                <div class="flex-row">
-                    <select id="advisorSelect" class="auto-save">
-                        <option value="">เลือกอาจารย์...</option>
-                    </select>
-                    <input type="text" id="newAdvisor" placeholder="อาจารย์...">
-                    <button class="btn-secondary" onclick="addAdvisor()">เพิ่มรายชื่อ</button>
+            <div class="detail-header">
+                <h1 id="web-title">หัวข้อปฏิบัติการ</h1>
+                <p id="web-advisor" class="detail-subtitle"></p>
+                <p id="web-responsibility" class="detail-subtitle"></p>
+            </div>
+            <hr class="divider">
+
+            <section class="detail-section">
+                <h3>วัตถุประสงค์</h3>
+                <ul id="web-objectives" class="detail-list"></ul>
+            </section>
+
+            <section id="web-equipments-section" class="detail-section">
+                <h3>อุปกรณ์ที่ใช้</h3>
+                <ul id="web-equipments" class="detail-list"></ul>
+            </section>
+
+            <section id="web-problems-section" class="detail-section">
+                <h3>ปัญหาที่พบและแนวทางการแก้ไข</h3>
+                <ul id="web-problems" class="detail-list"></ul>
+            </section>
+
+            <section id="web-flowchart-section" class="detail-section">
+                <h3 class="text-center">ขั้นตอนการทดลอง</h3>
+                <div id="web-flowchart" class="detail-flowchart mt-10"></div>
+            </section>
+
+            <section class="detail-section">
+                <h3>สรุปผล</h3>
+                <p id="web-summary" class="detail-summary-paragraph"></p>
+            </section>
+
+            <section class="detail-section">
+                <div id="web-gallery" class="detail-gallery">
+                    <div id="web-gallery-main" class="detail-gallery-main"></div>
+                    <div id="web-gallery-thumbs" class="detail-gallery-thumbs"></div>
                 </div>
-            </div>
-
-            <div class="form-group">
-                <label>วัตถุประสงค์</label>
-                <div id="objectiveList"></div>
-                <button class="btn-text" onclick="addListItem('objectiveList', 'วัตถุประสงค์')">+ เพิ่มวัตถุประสงค์</button>
-            </div>
-
-            <div class="form-group">
-                <label>เครื่องมือและอุปกรณ์ที่ใช้ในปฏิบัติการ</label>
-                <div id="equipmentList"></div>
-                <button class="btn-text" onclick="addListItem('equipmentList', 'อุปกรณ์')">+ เพิ่มอุปกรณ์</button>
-            </div>
-
-            <div class="form-group">
-                <label>ปัญหาที่พบ และ แนวทางการแก้ไข</label>
-                <div id="problemList"></div>
-                <button class="btn-text" onclick="addProblemPair()">+ เพิ่มปัญหาและแนวทางแก้ไข</button>
-            </div>
-
-            <div class="form-group">
-                <label>สรุปผลการทดลอง</label>
-                <textarea id="labSummary" rows="4" class="auto-save"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>อัปโหลดภาพประกอบปฏิบัติการ (สูงสุด 3 ภาพ)</label>
-                <input type="file" id="imageUpload" accept="image/*" multiple max="3">
-                <div id="imagePreviewContainer" class="image-preview-container"></div>
-            </div>
-
-            <div class="form-group flowchart-editor">
-                <label>ขั้นตอนการทดลอง (Flowchart)</label>
-                <div class="flowchart-box">Start</div>
-                <div class="flow-arrow">↓</div>
-                
-                <div id="flowchartContainer"></div>
-                
-                <button class="btn-add-flow" onclick="addFlowchartStep()">+</button>
-                <div class="flow-arrow">↓</div>
-                <div class="flowchart-box end-box">End</div>
-            </div>
-
-            <div class="button-group mt-20">
-                <button class="btn-secondary" onclick="switchView('portfolio-main-view')">กลับหน้าหลัก</button>
-                <button class="btn-primary" onclick="preparePreview()">Preview PDF</button>
-            </div>
+            </section>
         </div>
     </div>
-
-    <!-- ================= 4. หน้า PDF Preview / Web เนื้อหา ================= -->
-    <div id="preview-view" class="view-section hidden">
-        <div class="no-print print-actions">
-            <button class="btn-secondary" onclick="switchView('admin-form-view')">กลับไปแก้ไข</button>
-            <button class="btn-primary" onclick="downloadPDF()">Download PDF</button>
-        </div>
-
-        <div class="page-a4" id="pdf-content">
-            <div class="pdf-header">
-                <div>
-                    <h2 id="pdf-title">หัวข้อปฏิบัติการ</h2>
-                    <p class="sub-info">วิศวกรรมเครื่องกล | มหาวิทยาลัยศรีปทุม</p>
-                </div>
-                <div id="qrcode" class="qr-container"></div>
-            </div>
-
-            <!-- เนื้อหาจะถูก Inject ด้วย JavaScript ตามโครงสร้าง Wireframe -->
-            <div id="pdf-body" class="pdf-body"></div>
-        </div>
-    </div>
-
-    <script type="module" src="js/app.js"></script>
 </body>
 </html>
