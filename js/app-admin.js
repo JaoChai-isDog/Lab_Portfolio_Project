@@ -20,16 +20,35 @@ import {
     mergeLabs
 } from './utils.js';
 import { renderPdfPreview, downloadLabPdf } from './pdf-export.js';
+import { MUJI_CHART_COLORS, hasValidChartData, renderSmoothScatterSvg } from './chart-helper.js';
 import { SAMPLE_LAB_DATA } from './sample-data.js';
 
 const MAX_IMAGES = 3;
+const MAX_CHART_SERIES = MUJI_CHART_COLORS.length;
 
 let currentLabId = generateNewLabId();
 let savedLabsMap = {};
 let uploadedImages = [];
+let imageCaptions = [];
+let chartState = createDefaultChartState();
 let flowStepCount = 0;
 let saveTimeout = null;
 let isPopulatingForm = false;
+
+function createDefaultChartState() {
+    return {
+        title: '',
+        xLabel: '',
+        yLabel: '',
+        seriesNames: ['ชุดข้อมูล 1', 'ชุดข้อมูล 2'],
+        rows: [
+            { x: '', values: ['', ''] },
+            { x: '', values: ['', ''] },
+            { x: '', values: ['', ''] },
+            { x: '', values: ['', ''] }
+        ]
+    };
+}
 
 function generateNewLabId() {
     return `lab_${Date.now()}`;
@@ -205,8 +224,228 @@ function handleAddAdvisor() {
     scheduleAutoSave();
 }
 
+function ensureCourseOption(courseName) {
+    const select = document.getElementById('courseSelect');
+    if (!select || !courseName) return;
+
+    const exists = Array.from(select.options).some((opt) => opt.value === courseName);
+    if (!exists) {
+        const option = document.createElement('option');
+        option.value = courseName;
+        option.textContent = courseName;
+        select.add(option);
+    }
+}
+
+function handleAddCourse() {
+    const input = document.getElementById('newCourse');
+    const select = document.getElementById('courseSelect');
+    if (!input || !select) return;
+
+    const name = input.value.trim();
+    if (!name) return;
+
+    ensureCourseOption(name);
+    select.value = name;
+    input.value = '';
+    scheduleAutoSave();
+}
+
 // ==========================================
-// 2. จัดการรูปภาพ (สูงสุด 3 ภาพ + บีบอัด)
+// 2. จัดการตารางกราฟแบบ Microsoft Word + พรีวิวสด
+// ==========================================
+function normalizeChartState(rawChart) {
+    if (!rawChart || !Array.isArray(rawChart.seriesNames) || rawChart.seriesNames.length === 0) {
+        return createDefaultChartState();
+    }
+    const seriesNames = rawChart.seriesNames.slice(0, MAX_CHART_SERIES).map((n, idx) =>
+        typeof n === 'string' && n.trim() ? n.trim() : `ชุดข้อมูล ${idx + 1}`
+    );
+    const seriesCount = seriesNames.length;
+    const rawRows = Array.isArray(rawChart.rows) && rawChart.rows.length > 0
+        ? rawChart.rows
+        : [{ x: '', values: new Array(seriesCount).fill('') }];
+
+    const rows = rawRows.map((r) => {
+        const vals = Array.isArray(r?.values) ? r.values : [];
+        return {
+            x: r?.x !== undefined && r?.x !== null ? String(r.x) : '',
+            values: Array.from({ length: seriesCount }, (_, i) =>
+                vals[i] !== undefined && vals[i] !== null ? String(vals[i]) : ''
+            )
+        };
+    });
+
+    return {
+        title: rawChart.title || '',
+        xLabel: rawChart.xLabel || '',
+        yLabel: rawChart.yLabel || '',
+        seriesNames,
+        rows
+    };
+}
+
+function updateAdminChartPreview() {
+    const previewEl = document.getElementById('adminChartPreview');
+    if (!previewEl) return;
+
+    const currentChart = {
+        ...chartState,
+        title: document.getElementById('chartTitle')?.value.trim() || '',
+        xLabel: document.getElementById('chartXLabel')?.value.trim() || '',
+        yLabel: document.getElementById('chartYLabel')?.value.trim() || ''
+    };
+
+    if (hasValidChartData(currentChart)) {
+        previewEl.innerHTML = renderSmoothScatterSvg(currentChart, { width: 620, height: 290 });
+    } else {
+        previewEl.innerHTML =
+            '<p class="text-light text-center chart-empty-hint">กรอกตัวเลขในตารางด้านบนเพื่อแสดงตัวอย่างกราฟเส้นเรียบโทน Muji</p>';
+    }
+}
+
+function renderChartTable() {
+    const thead = document.getElementById('chartTableHead');
+    const tbody = document.getElementById('chartTableBody');
+    if (!thead || !tbody) return;
+
+    // ส่วนหัวตาราง (แกน X + ชื่อชุดข้อมูลแต่ละเส้น)
+    thead.innerHTML = '';
+    const headRow = document.createElement('tr');
+
+    const thX = document.createElement('th');
+    thX.className = 'chart-col-x';
+    thX.textContent = 'ค่าแกน X';
+    headRow.appendChild(thX);
+
+    chartState.seriesNames.forEach((name, sIdx) => {
+        const th = document.createElement('th');
+        const wrap = document.createElement('div');
+        wrap.className = 'chart-series-head';
+
+        const dot = document.createElement('span');
+        dot.className = 'series-color-dot';
+        dot.style.backgroundColor = MUJI_CHART_COLORS[sIdx % MUJI_CHART_COLORS.length];
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'chart-head-input';
+        nameInput.value = name;
+        nameInput.placeholder = `ชุดข้อมูล ${sIdx + 1}`;
+        nameInput.addEventListener('input', (e) => {
+            chartState.seriesNames[sIdx] = e.target.value;
+            updateAdminChartPreview();
+            scheduleAutoSave();
+        });
+
+        wrap.append(dot, nameInput);
+
+        if (chartState.seriesNames.length > 1) {
+            const delSeriesBtn = document.createElement('button');
+            delSeriesBtn.type = 'button';
+            delSeriesBtn.className = 'chart-del-btn';
+            delSeriesBtn.textContent = '✕';
+            delSeriesBtn.title = 'ลบชุดข้อมูลนี้';
+            delSeriesBtn.addEventListener('click', () => {
+                chartState.seriesNames.splice(sIdx, 1);
+                chartState.rows.forEach((r) => r.values.splice(sIdx, 1));
+                renderChartTable();
+                scheduleAutoSave();
+            });
+            wrap.appendChild(delSeriesBtn);
+        }
+
+        th.appendChild(wrap);
+        headRow.appendChild(th);
+    });
+
+    const thAction = document.createElement('th');
+    thAction.className = 'chart-col-action';
+    thAction.textContent = '';
+    headRow.appendChild(thAction);
+    thead.appendChild(headRow);
+
+    // แถวข้อมูลตัวเลข
+    tbody.innerHTML = '';
+    chartState.rows.forEach((row, rIdx) => {
+        const tr = document.createElement('tr');
+
+        const tdX = document.createElement('td');
+        const inputX = document.createElement('input');
+        inputX.type = 'number';
+        inputX.step = 'any';
+        inputX.className = 'chart-cell-input';
+        inputX.placeholder = '0';
+        inputX.value = row.x;
+        inputX.addEventListener('input', (e) => {
+            chartState.rows[rIdx].x = e.target.value;
+            updateAdminChartPreview();
+            scheduleAutoSave();
+        });
+        tdX.appendChild(inputX);
+        tr.appendChild(tdX);
+
+        chartState.seriesNames.forEach((_, sIdx) => {
+            const tdY = document.createElement('td');
+            const inputY = document.createElement('input');
+            inputY.type = 'number';
+            inputY.step = 'any';
+            inputY.className = 'chart-cell-input';
+            inputY.placeholder = '-';
+            inputY.value = row.values[sIdx] ?? '';
+            inputY.addEventListener('input', (e) => {
+                chartState.rows[rIdx].values[sIdx] = e.target.value;
+                updateAdminChartPreview();
+                scheduleAutoSave();
+            });
+            tdY.appendChild(inputY);
+            tr.appendChild(tdY);
+        });
+
+        const tdAction = document.createElement('td');
+        tdAction.className = 'chart-col-action';
+        if (chartState.rows.length > 1) {
+            const delRowBtn = document.createElement('button');
+            delRowBtn.type = 'button';
+            delRowBtn.className = 'chart-del-btn';
+            delRowBtn.textContent = '-';
+            delRowBtn.title = 'ลบแถวนี้';
+            delRowBtn.addEventListener('click', () => {
+                chartState.rows.splice(rIdx, 1);
+                renderChartTable();
+                scheduleAutoSave();
+            });
+            tdAction.appendChild(delRowBtn);
+        }
+        tr.appendChild(tdAction);
+        tbody.appendChild(tr);
+    });
+
+    updateAdminChartPreview();
+}
+
+function addChartRow() {
+    chartState.rows.push({
+        x: '',
+        values: new Array(chartState.seriesNames.length).fill('')
+    });
+    renderChartTable();
+    scheduleAutoSave();
+}
+
+function addChartSeries() {
+    if (chartState.seriesNames.length >= MAX_CHART_SERIES) {
+        alert(`เพิ่มชุดข้อมูลได้สูงสุด ${MAX_CHART_SERIES} เส้นกราฟครับ`);
+        return;
+    }
+    chartState.seriesNames.push(`ชุดข้อมูล ${chartState.seriesNames.length + 1}`);
+    chartState.rows.forEach((row) => row.values.push(''));
+    renderChartTable();
+    scheduleAutoSave();
+}
+
+// ==========================================
+// 3. จัดการรูปภาพ (สูงสุด 3 ภาพ + ครอบ 1:1 + คำอธิบายใต้ภาพสำหรับ PDF)
 // ==========================================
 function renderImagePreview() {
     const container = document.getElementById('imagePreview');
@@ -216,8 +455,11 @@ function renderImagePreview() {
     uploadedImages.forEach((imgSrc, index) => {
         if (!isSafeImageUrl(imgSrc)) return;
 
-        const item = document.createElement('div');
-        item.className = 'img-preview-item';
+        const card = document.createElement('div');
+        card.className = 'img-preview-card';
+
+        const thumbWrap = document.createElement('div');
+        thumbWrap.className = 'img-preview-item';
 
         const img = document.createElement('img');
         img.src = imgSrc;
@@ -231,12 +473,33 @@ function renderImagePreview() {
         removeBtn.setAttribute('aria-label', `ลบรูปภาพที่ ${index + 1}`);
         removeBtn.addEventListener('click', () => {
             uploadedImages.splice(index, 1);
+            imageCaptions.splice(index, 1);
             renderImagePreview();
             scheduleAutoSave();
         });
 
-        item.append(img, removeBtn);
-        container.appendChild(item);
+        thumbWrap.append(img, removeBtn);
+
+        const captionWrap = document.createElement('div');
+        captionWrap.className = 'img-caption-wrap';
+
+        const captionLabel = document.createElement('label');
+        captionLabel.className = 'img-caption-label';
+        captionLabel.textContent = `รูปที่ ${index + 1} (แสดงเฉพาะใน PDF)`;
+
+        const captionInput = document.createElement('input');
+        captionInput.type = 'text';
+        captionInput.className = 'img-caption-input';
+        captionInput.placeholder = 'เช่น ชุดทดสอบและเกจวัดความดัน';
+        captionInput.value = imageCaptions[index] || '';
+        captionInput.addEventListener('input', (e) => {
+            imageCaptions[index] = e.target.value;
+            scheduleAutoSave();
+        });
+
+        captionWrap.append(captionLabel, captionInput);
+        card.append(thumbWrap, captionWrap);
+        container.appendChild(card);
     });
 }
 
@@ -258,6 +521,9 @@ async function handleImageFiles(files) {
         try {
             const compressedDataUrl = await compressImageToDataUrl(file, 600, 0.72);
             uploadedImages.push(compressedDataUrl);
+            if (imageCaptions.length < uploadedImages.length) {
+                imageCaptions.push('');
+            }
             renderImagePreview();
         } catch (err) {
             console.error('Image processing failed:', err);
@@ -269,7 +535,7 @@ async function handleImageFiles(files) {
 }
 
 // ==========================================
-// 3. รวบรวมข้อมูล / โหลดข้อมูล / บันทึก (Local + Cloud)
+// 4. รวบรวมข้อมูล / โหลดข้อมูล / บันทึก (Local + Cloud)
 // ==========================================
 function collectFormData() {
     const getListValues = (containerId) =>
@@ -291,16 +557,31 @@ function collectFormData() {
         .map((input) => input.value.trim())
         .filter(Boolean);
 
+    const chart = {
+        title: document.getElementById('chartTitle')?.value.trim() || '',
+        xLabel: document.getElementById('chartXLabel')?.value.trim() || '',
+        yLabel: document.getElementById('chartYLabel')?.value.trim() || '',
+        seriesNames: chartState.seriesNames.map((n, idx) => n.trim() || `ชุดข้อมูล ${idx + 1}`),
+        rows: chartState.rows.map((r) => ({
+            x: String(r.x ?? '').trim(),
+            values: r.values.map((v) => String(v ?? '').trim())
+        }))
+    };
+
     return {
+        labDate: document.getElementById('labDate')?.value.trim() || '',
+        course: document.getElementById('courseSelect')?.value.trim() || '',
         title: document.getElementById('labTitle')?.value.trim() || '',
         advisor: document.getElementById('advisorSelect')?.value.trim() || '',
         responsibility: document.getElementById('responsibility')?.value.trim() || '',
         objectives: getListValues('objectiveList'),
         equipments: getListValues('equipmentList'),
         problems,
+        chart,
         summary: document.getElementById('labSummary')?.value.trim() || '',
         flowSteps,
         images: [...uploadedImages],
+        imageCaptions: uploadedImages.map((_, i) => (imageCaptions[i] || '').trim()),
         updatedAt: new Date().toISOString()
     };
 }
@@ -314,11 +595,21 @@ function populateForm(data = {}) {
         if (el) el.value = val || '';
     };
 
+    setVal('labDate', data.labDate);
+    if (data.course) ensureCourseOption(data.course);
+    setVal('courseSelect', data.course);
     setVal('labTitle', data.title);
     if (data.advisor) ensureAdvisorOption(data.advisor);
     setVal('advisorSelect', data.advisor);
     setVal('responsibility', data.responsibility);
     setVal('labSummary', data.summary);
+
+    // ตารางกราฟ
+    chartState = normalizeChartState(data.chart);
+    setVal('chartTitle', chartState.title);
+    setVal('chartXLabel', chartState.xLabel);
+    setVal('chartYLabel', chartState.yLabel);
+    renderChartTable();
 
     const objContainer = document.getElementById('objectiveList');
     if (objContainer) {
@@ -351,6 +642,8 @@ function populateForm(data = {}) {
     }
 
     uploadedImages = Array.isArray(data.images) ? data.images.filter(isSafeImageUrl).slice(0, MAX_IMAGES) : [];
+    const savedCaptions = Array.isArray(data.imageCaptions) ? data.imageCaptions : [];
+    imageCaptions = uploadedImages.map((_, i) => savedCaptions[i] || '');
     renderImagePreview();
 
     isPopulatingForm = false;
@@ -453,6 +746,7 @@ function renderLabSelector() {
         opt.textContent = data?.title || `(ไม่มีชื่อหัวข้อ - ${id})`;
         selector.appendChild(opt);
         if (data?.advisor) ensureAdvisorOption(data.advisor);
+        if (data?.course) ensureCourseOption(data.course);
     });
 
     if (savedLabsMap[currentLabId]) {
@@ -590,6 +884,14 @@ function bindEvents() {
         scheduleAutoSave();
     });
 
+    document.getElementById('btnAddCourse')?.addEventListener('click', handleAddCourse);
+    document.getElementById('newCourse')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddCourse();
+        }
+    });
+
     document.getElementById('btnAddAdvisor')?.addEventListener('click', handleAddAdvisor);
     document.getElementById('newAdvisor')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -611,6 +913,14 @@ function bindEvents() {
         addFlowchartStep();
     });
     document.getElementById('btnRemoveFlowStep')?.addEventListener('click', removeFlowchartStep);
+
+    document.getElementById('btnAddChartRow')?.addEventListener('click', addChartRow);
+    document.getElementById('btnAddChartSeries')?.addEventListener('click', addChartSeries);
+    ['chartTitle', 'chartXLabel', 'chartYLabel'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('input', () => {
+            updateAdminChartPreview();
+        });
+    });
 
     const uploadBox = document.getElementById('uploadBox');
     const imageUpload = document.getElementById('imageUpload');

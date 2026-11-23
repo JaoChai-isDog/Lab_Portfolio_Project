@@ -67,6 +67,22 @@
             </div>
 
             <div class="form-group">
+                <label for="labDate">วันที่ทำการทดลอง</label>
+                <input type="date" id="labDate" class="auto-save">
+            </div>
+
+            <div class="form-group">
+                <label for="courseSelect">ชื่อรายวิชา</label>
+                <select id="courseSelect" class="auto-save mb-10">
+                    <option value="">-- เลือกรายวิชา --</option>
+                </select>
+                <div class="flex-row">
+                    <input type="text" id="newCourse" class="flex-1" placeholder="เพิ่มชื่อรายวิชาใหม่...">
+                    <button type="button" id="btnAddCourse" class="btn-secondary">+ เพิ่มชื่อ</button>
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label for="labTitle">หัวข้อปฏิบัติการ</label>
                 <input type="text" id="labTitle" class="auto-save" placeholder="เช่น การหาประสิทธิภาพปั๊มน้ำ">
             </div>
@@ -106,12 +122,46 @@
             </div>
 
             <div class="form-group">
+                <label>กราฟผลการทดลอง (แผนภูมิกระจายเส้นเรียบ — ตารางแบบ Microsoft Word)</label>
+                <div class="chart-editor-card">
+                    <div class="chart-meta-grid">
+                        <div>
+                            <label for="chartTitle" class="sub-label">ชื่อกราฟ (ไม่บังคับ)</label>
+                            <input type="text" id="chartTitle" class="auto-save" placeholder="เช่น กราฟสมรรถนะปั๊มน้ำ">
+                        </div>
+                        <div>
+                            <label for="chartXLabel" class="sub-label">ชื่อแกน X</label>
+                            <input type="text" id="chartXLabel" class="auto-save" placeholder="เช่น อัตราการไหล (L/min)">
+                        </div>
+                        <div>
+                            <label for="chartYLabel" class="sub-label">ชื่อแกน Y</label>
+                            <input type="text" id="chartYLabel" class="auto-save" placeholder="เช่น ประสิทธิภาพ (%)">
+                        </div>
+                    </div>
+
+                    <div class="chart-table-wrap">
+                        <table id="chartDataTable" class="chart-excel-table">
+                            <thead id="chartTableHead"></thead>
+                            <tbody id="chartTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex-row flex-wrap mt-10">
+                        <button type="button" id="btnAddChartRow" class="btn-secondary btn-sm">+ เพิ่มแถวข้อมูล</button>
+                        <button type="button" id="btnAddChartSeries" class="btn-secondary btn-sm">+ เพิ่มชุดข้อมูล (เส้นกราฟ)</button>
+                    </div>
+
+                    <div id="adminChartPreview" class="chart-live-preview mt-10"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label for="labSummary">สรุปผลการทดลอง</label>
                 <textarea id="labSummary" class="auto-save" placeholder="สรุปผลที่ได้จากการทดลอง..."></textarea>
             </div>
 
             <div class="form-group">
-                <label for="imageUpload">ภาพประกอบปฏิบัติการ (สูงสุด 3 ภาพ)</label>
+                <label for="imageUpload">ภาพประกอบปฏิบัติการ (สูงสุด 3 ภาพ — กรอกคำอธิบายใต้ภาพสำหรับ PDF ได้)</label>
                 <div id="uploadBox" class="upload-box" role="button" tabindex="0">
                     คลิกเพื่อเลือกรูปภาพประกอบ (รองรับ JPG, PNG สูงสุด 3 ภาพ)
                 </div>

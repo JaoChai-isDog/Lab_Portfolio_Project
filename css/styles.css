@@ -179,6 +179,7 @@ label {
 input[type="text"],
 input[type="email"],
 input[type="password"],
+input[type="date"],
 select,
 textarea {
     width: 100%;
@@ -423,13 +424,165 @@ button:disabled {
 
 .img-preview-grid {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 12px;
-    margin-top: 12px;
+    margin-top: 14px;
+}
+
+.img-preview-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px;
+    background: #FCFBF9;
+    border: 1px solid var(--muji-border);
+    border-radius: 8px;
 }
 
 .img-preview-item {
     position: relative;
+    flex-shrink: 0;
+}
+
+.img-caption-wrap {
+    flex: 1;
+    min-width: 0;
+}
+
+.img-caption-label {
+    font-size: 0.85rem;
+    color: var(--muji-text-light);
+    margin-bottom: 4px;
+}
+
+.img-caption-input {
+    padding: 8px 12px !important;
+    font-size: 0.9rem;
+}
+
+/* ==========================================
+   Admin Chart Editor (Microsoft Word Style)
+   ========================================== */
+.chart-editor-card {
+    background: #FCFBF9;
+    border: 1px solid var(--muji-border);
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.chart-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.sub-label {
+    font-size: 0.84rem;
+    color: var(--muji-text-light);
+    margin-bottom: 4px;
+}
+
+.chart-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--muji-border);
+    border-radius: 8px;
+    background: var(--muji-surface);
+}
+
+.chart-excel-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 360px;
+}
+
+.chart-excel-table th,
+.chart-excel-table td {
+    border: 1px solid var(--muji-border);
+    padding: 4px 6px;
+    vertical-align: middle;
+}
+
+.chart-excel-table thead th {
+    background: #F4F1EB;
+    font-weight: 500;
+    font-size: 0.86rem;
+    color: var(--muji-text-main);
+}
+
+.chart-col-x {
+    width: 110px;
+    text-align: center;
+}
+
+.chart-col-action {
+    width: 36px;
+    text-align: center;
+}
+
+.chart-series-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.series-color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.chart-head-input,
+.chart-cell-input {
+    width: 100%;
+    padding: 6px 8px !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    border-radius: 4px !important;
+    font-size: 0.88rem;
+}
+
+.chart-head-input:focus,
+.chart-cell-input:focus {
+    background: #FFFFFF !important;
+    border-color: var(--muji-accent) !important;
+    box-shadow: none !important;
+}
+
+.chart-cell-input {
+    text-align: right;
+}
+
+.chart-del-btn {
+    padding: 2px 7px;
+    font-size: 0.78rem;
+    background: transparent;
+    color: var(--muji-text-light);
+    border-radius: 4px;
+}
+
+.chart-del-btn:hover {
+    color: var(--muji-danger);
+    background: #FDF2F2;
+}
+
+.chart-live-preview {
+    background: #FFFFFF;
+    border: 1px solid var(--muji-border);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.chart-empty-hint {
+    padding: 18px 8px;
+    font-size: 0.88rem;
+}
+
+.muji-chart-svg {
+    display: block;
+    width: 100%;
+    height: auto;
 }
 
 .img-thumb {
@@ -552,6 +705,20 @@ button:disabled {
 /* ==========================================
    Public Detail Page (Wireframe)
    ========================================== */
+.detail-top-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.94rem;
+    color: var(--muji-text-light);
+    margin-bottom: 4px;
+}
+
+.detail-meta-sep {
+    color: #C5BFB5;
+}
+
 .detail-header h1 {
     font-size: 1.6rem;
     font-weight: 700;
@@ -560,9 +727,15 @@ button:disabled {
 }
 
 .detail-subtitle {
-    font-size: 0.98rem;
+    font-size: 0.96rem;
     color: var(--muji-text-light);
     margin-bottom: 2px;
+}
+
+.detail-chart-box {
+    background: #FFFFFF;
+    border-radius: 8px;
+    overflow: hidden;
 }
 
 .detail-section {
@@ -769,6 +942,18 @@ button:disabled {
     line-height: 1.45;
 }
 
+.pdf-header-top-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.pdf-header-sep {
+    color: #999;
+}
+
 .pdf-qr-box {
     width: 84px;
     height: 84px;
@@ -885,6 +1070,12 @@ button:disabled {
     font-weight: 700;
 }
 
+.pdf-chart-box {
+    width: 100%;
+    margin-top: 6px;
+    margin-bottom: 8px;
+}
+
 .pdf-summary-text {
     white-space: pre-wrap;
     line-height: 1.55;
@@ -896,7 +1087,13 @@ button:disabled {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
-    margin-top: 12px;
+    margin-top: 16px;
+}
+
+.pdf-image-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .pdf-image-slot {
@@ -908,6 +1105,16 @@ button:disabled {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.pdf-image-caption {
+    margin-top: 6px;
+    font-size: 0.84rem;
+    color: #333;
+    text-align: center;
+    line-height: 1.35;
+    overflow-wrap: break-word;
+    width: 100%;
 }
 
 .pdf-image-slot img {
@@ -946,6 +1153,19 @@ button:disabled {
 
     .muji-card {
         padding: 22px 18px;
+    }
+
+    .chart-meta-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .img-preview-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .img-caption-wrap {
+        width: 100%;
     }
 
     .lab-card-wireframe {

@@ -1,5 +1,6 @@
-import { escapeHtml, isSafeImageUrl } from './utils.js';
+import { escapeHtml, isSafeImageUrl, formatThaiDate, EXPERIMENTER_INFO } from './utils.js';
 import { buildPublicLabUrl, renderQRCode } from './qrcode-helper.js';
+import { hasValidChartData, renderSmoothScatterSvg } from './chart-helper.js';
 
 /**
  * สร้างโครงหน้ากระดาษ A4 เปล่า 1 แผ่น (พร้อมป้ายเลขหน้าสำหรับพรีวิว)
@@ -32,52 +33,9 @@ function createA4PageShell(pageNumber) {
 }
 
 /**
- * ตรวจสอบความสูงของหน้า 1:
- * หากชุดภาพประกอบ (และสรุปผล) ล้นความสูงกระดาษ A4 จนอาจถูกตัดข้ามหน้า
- * ให้ย้ายทั้งชุด "สรุปผล + ภาพประกอบ 3 อัน" ไปขึ้นหน้า 2 ทันที
- * @param {HTMLElement | null} pagesContainer
- */
-export function paginatePdfPages(pagesContainer) {
-    if (!pagesContainer) return;
-
-    const page1Wrapper = pagesContainer.querySelector('.pdf-page-wrapper[data-page="1"]');
-    const page1El = page1Wrapper?.querySelector('.page-a4');
-    const summaryImagesGroup = pagesContainer.querySelector('.pdf-summary-images-group');
-    if (!page1El || !summaryImagesGroup) return;
-
-    // หากเคยย้ายไปหน้า 2 แล้ว ให้ย้ายกลับหน้า 1 ก่อนเพื่อวัดใหม่ให้แม่นยำ (เช่น หลังฟอนต์โหลดเสร็จ)
-    const existingPage2 = pagesContainer.querySelector('.pdf-page-wrapper[data-page="2"]');
-    if (existingPage2) {
-        const page1Body = page1El.querySelector('.pdf-body');
-        if (page1Body && summaryImagesGroup.parentElement !== page1Body) {
-            page1Body.appendChild(summaryImagesGroup);
-        }
-        existingPage2.remove();
-    }
-
-    const pageWidthPx = page1El.offsetWidth;
-    if (!pageWidthPx) return;
-
-    // คำนวณความสูงกระดาษ A4 (297mm / 210mm) เทียบกับความกว้างจริงในหน่วย px
-    const a4HeightPx = (pageWidthPx * 297) / 210;
-    const paddingBottomPx = parseFloat(window.getComputedStyle(page1El).paddingBottom) || 0;
-    const pageRect = page1El.getBoundingClientRect();
-    const groupRect = summaryImagesGroup.getBoundingClientRect();
-    const contentBottomPx = groupRect.bottom - pageRect.top + paddingBottomPx;
-
-    // ถ้าความสูงเกิน 1 หน้า A4 -> ย้ายทั้ง "สรุปผล + ชุดภาพประกอบ 3 ภาพ" ไปหน้า 2 ทันที
-    if (contentBottomPx > a4HeightPx + 1) {
-        const { wrapper: page2Wrapper, pageEl: page2El } = createA4PageShell(2);
-        const page2Body = document.createElement('div');
-        page2Body.className = 'pdf-body';
-        page2Body.appendChild(summaryImagesGroup);
-        page2El.appendChild(page2Body);
-        pagesContainer.appendChild(page2Wrapper);
-    }
-}
-
-/**
- * สร้างเนื้อหาเอกสารขนาด A4 ตามแบบ Wireframe สำหรับพรีวิว ปริ้น และดาวน์โหลด PDF
+ * สร้างเอกสารขนาด A4 แบบ 2 หน้าชัดเจน:
+ * - หน้า 1: หัวข้อ, ข้อมูลผู้ทดลอง/คณะ-สาขา, อาจารย์, ความรับผิดชอบ, QR Code, วัตถุประสงค์, อุปกรณ์, Flowchart, ตารางปัญหา-แนวทาง
+ * - หน้า 2: กราฟผลการทดลอง (เหนือสรุปผล), สรุปผล, ภาพประกอบ 1:1 จำนวน 3 ช่องพร้อมคำอธิบายใต้ภาพเฉพาะ PDF
  * @param {object} labData
  * @param {HTMLElement | null} pagesContainer
  * @param {string} labId
@@ -86,6 +44,8 @@ export function renderPdfPreview(labData, pagesContainer, labId) {
     if (!pagesContainer) return;
     pagesContainer.innerHTML = '';
 
+    const labDateText = labData.labDate ? formatThaiDate(labData.labDate) : '-';
+    const courseText = labData.course?.trim() || '-';
     const title = labData.title?.trim() || 'ไม่ได้ระบุหัวข้อปฏิบัติการ';
     const advisorText = `อาจารย์ที่ปรึกษา: ${labData.advisor?.trim() || '-'}`;
     const responsibilityText = `ความรับผิดชอบ: ${labData.responsibility?.trim() || '-'}`;
@@ -97,6 +57,7 @@ export function renderPdfPreview(labData, pagesContainer, labId) {
         : [];
     const flowSteps = Array.isArray(labData.flowSteps) ? labData.flowSteps.filter(Boolean) : [];
     const images = Array.isArray(labData.images) ? labData.images.filter(isSafeImageUrl).slice(0, 3) : [];
+    const imageCaptions = Array.isArray(labData.imageCaptions) ? labData.imageCaptions : [];
     const summaryText = labData.summary?.trim() || '-';
     const summaryHtml = `\u00A0\u00A0\u00A0\u00A0${escapeHtml(summaryText)}`;
 
@@ -141,25 +102,56 @@ export function renderPdfPreview(labData, pagesContainer, labId) {
               .join('')
         : '<tr><td>-</td><td>-</td></tr>';
 
-    // ช่องรูปภาพสัดส่วน 1:1 จำนวน 3 ช่องด้านล่างตามแบบ Wireframe
-    const imageSlots = [];
+    // กราฟผลการทดลอง (วางเหนือสรุปผลในหน้า 2)
+    const chartSectionHtml = hasValidChartData(labData.chart)
+        ? `
+            <div class="pdf-block pdf-avoid-break">
+                <h3 class="pdf-heading">กราฟผลการทดลอง</h3>
+                <div class="pdf-chart-box">
+                    ${renderSmoothScatterSvg(labData.chart, { width: 660, height: 300 })}
+                </div>
+            </div>
+        `
+        : '';
+
+    // ช่องรูปภาพสัดส่วน 1:1 จำนวน 3 ช่อง + คำอธิบายใต้ภาพเฉพาะใน PDF (รูปที่ 1 ...)
+    const imageCells = [];
     for (let i = 0; i < 3; i += 1) {
         if (images[i]) {
-            imageSlots.push(`
-                <div class="pdf-image-slot">
-                    <img src="${escapeHtml(images[i])}" alt="ภาพประกอบปฏิบัติการที่ ${i + 1}">
+            const rawCaption = (imageCaptions[i] || '').trim();
+            const captionLabel = rawCaption
+                ? `รูปที่ ${i + 1} ${escapeHtml(rawCaption)}`
+                : `รูปที่ ${i + 1}`;
+            imageCells.push(`
+                <div class="pdf-image-cell">
+                    <div class="pdf-image-slot">
+                        <img src="${escapeHtml(images[i])}" alt="ภาพประกอบปฏิบัติการที่ ${i + 1}">
+                    </div>
+                    <p class="pdf-image-caption">${captionLabel}</p>
                 </div>
             `);
         } else {
-            imageSlots.push('<div class="pdf-image-slot pdf-image-placeholder">ภาพประกอบ</div>');
+            imageCells.push(`
+                <div class="pdf-image-cell">
+                    <div class="pdf-image-slot pdf-image-placeholder">ภาพประกอบ</div>
+                </div>
+            `);
         }
     }
 
+    // ---------- หน้า 1 ----------
     const { wrapper: page1Wrapper, pageEl: page1El } = createA4PageShell(1);
     page1El.innerHTML = `
         <div class="pdf-header">
             <div class="pdf-header-left">
+                <p class="pdf-header-meta pdf-header-top-line">
+                    <span>วันที่ทำการทดลอง: ${escapeHtml(labDateText)}</span>
+                    <span class="pdf-header-sep">|</span>
+                    <span>รายวิชา: ${escapeHtml(courseText)}</span>
+                </p>
                 <h2>${escapeHtml(title)}</h2>
+                <p class="pdf-header-meta">${escapeHtml(EXPERIMENTER_INFO.nameLine)}</p>
+                <p class="pdf-header-meta">${escapeHtml(EXPERIMENTER_INFO.facultyLine)}</p>
                 <p class="pdf-header-meta">${escapeHtml(advisorText)}</p>
                 <p class="pdf-header-meta">${escapeHtml(responsibilityText)}</p>
             </div>
@@ -199,31 +191,30 @@ export function renderPdfPreview(labData, pagesContainer, labId) {
                     <tbody>${problemsHtml}</tbody>
                 </table>
             </div>
+        </div>
+    `;
 
-            <div class="pdf-summary-images-group pdf-avoid-break">
-                <div class="pdf-block">
-                    <h3 class="pdf-heading">สรุปผล</h3>
-                    <p class="pdf-summary-text">${summaryHtml}</p>
-                </div>
+    // ---------- หน้า 2 (กราฟ + สรุปผล + ภาพประกอบพร้อมคำอธิบายใต้ภาพ) ----------
+    const { wrapper: page2Wrapper, pageEl: page2El } = createA4PageShell(2);
+    page2El.innerHTML = `
+        <div class="pdf-body">
+            ${chartSectionHtml}
 
-                <div class="pdf-images-grid">
-                    ${imageSlots.join('')}
-                </div>
+            <div class="pdf-block pdf-avoid-break">
+                <h3 class="pdf-heading">สรุปผล</h3>
+                <p class="pdf-summary-text">${summaryHtml}</p>
+            </div>
+
+            <div class="pdf-images-grid pdf-avoid-break">
+                ${imageCells.join('')}
             </div>
         </div>
     `;
 
-    pagesContainer.appendChild(page1Wrapper);
+    pagesContainer.append(page1Wrapper, page2Wrapper);
 
     const qrBox = page1El.querySelector('.pdf-qr-box');
     renderQRCode(qrBox, buildPublicLabUrl(labId), 84);
-
-    // วัดและแบ่งหน้าอัตโนมัติ (ทั้งทันทีและหลังฟอนต์/เฟรมเรนเดอร์เสร็จ)
-    paginatePdfPages(pagesContainer);
-    window.requestAnimationFrame(() => paginatePdfPages(pagesContainer));
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(() => paginatePdfPages(pagesContainer));
-    }
 }
 
 /**
@@ -255,9 +246,6 @@ export async function downloadLabPdf(pagesContainer, title = 'Portfolio') {
     if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
     }
-
-    // ตรวจสอบการแบ่งหน้าล่าสุดก่อนสร้างไฟล์ PDF
-    paginatePdfPages(pagesContainer);
 
     const pageEls = Array.from(pagesContainer.querySelectorAll('.page-a4'));
     if (pageEls.length === 0) return false;

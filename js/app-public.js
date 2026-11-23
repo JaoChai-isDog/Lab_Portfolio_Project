@@ -1,5 +1,6 @@
 import { db, collection, getDocs } from './firebase-config.js';
 import {
+    EXPERIMENTER_INFO,
     escapeHtml,
     isSafeImageUrl,
     formatThaiDate,
@@ -7,6 +8,7 @@ import {
     getLocalLabs,
     mergeLabs
 } from './utils.js';
+import { hasValidChartData, renderSmoothScatterSvg } from './chart-helper.js';
 
 let allLabsData = {};
 
@@ -75,7 +77,7 @@ function renderLabList(labs) {
 
         const dateEl = document.createElement('p');
         dateEl.className = 'lab-card-meta';
-        dateEl.textContent = `วันที่: ${formatThaiDate(data.updatedAt)}`;
+        dateEl.textContent = `วันที่: ${formatThaiDate(data.labDate || data.updatedAt)}`;
 
         const advisorEl = document.createElement('p');
         advisorEl.className = 'lab-card-meta';
@@ -147,8 +149,21 @@ function viewLabContent(labId) {
     const data = allLabsData[labId];
     if (!data) return;
 
+    const topMetaEl = document.getElementById('web-top-meta');
+    if (topMetaEl) {
+        const labDateText = data.labDate ? formatThaiDate(data.labDate) : '-';
+        const courseText = data.course?.trim() || '-';
+        topMetaEl.innerHTML = `<span>วันที่ทำการทดลอง: ${escapeHtml(labDateText)}</span><span class="detail-meta-sep">|</span><span>รายวิชา: ${escapeHtml(courseText)}</span>`;
+    }
+
     const titleEl = document.getElementById('web-title');
     if (titleEl) titleEl.textContent = data.title || 'ไม่มีชื่อหัวข้อปฏิบัติการ';
+
+    const expEl = document.getElementById('web-experimenter');
+    if (expEl) expEl.textContent = EXPERIMENTER_INFO.nameLine;
+
+    const facultyEl = document.getElementById('web-faculty');
+    if (facultyEl) facultyEl.textContent = EXPERIMENTER_INFO.facultyLine;
 
     const advisorEl = document.getElementById('web-advisor');
     if (advisorEl) advisorEl.textContent = `อาจารย์ที่ปรึกษา: ${data.advisor || '-'}`;
@@ -213,6 +228,19 @@ function viewLabContent(labId) {
             ${stepsHtml}
             <div class="wf-flow-pill">End</div>
         `;
+    }
+
+    // กราฟผลการทดลอง (วางเหนือสรุปผล)
+    const chartSection = document.getElementById('web-chart-section');
+    const chartBox = document.getElementById('web-chart');
+    if (chartSection && chartBox) {
+        if (hasValidChartData(data.chart)) {
+            chartBox.innerHTML = renderSmoothScatterSvg(data.chart, { width: 640, height: 320 });
+            chartSection.classList.remove('hidden');
+        } else {
+            chartBox.innerHTML = '';
+            chartSection.classList.add('hidden');
+        }
     }
 
     // สรุปผล

@@ -1,5 +1,10 @@
 const LOCAL_STORAGE_KEY = 'lab_portfolio_labs_v1';
 
+export const EXPERIMENTER_INFO = {
+    nameLine: 'ผู้ทำการทดลอง : นางสาวเปมิกา ค้ายาดี รหัสนักศึกษา 67167571',
+    facultyLine: 'คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมเครื่องกล'
+};
+
 /**
  * แปลงอักขระพิเศษของ HTML เพื่อป้องกันช่องโหว่ XSS
  * @param {unknown} value
@@ -40,6 +45,9 @@ export function formatThaiDate(value) {
     let date;
     if (typeof value === 'object' && typeof value.toDate === 'function') {
         date = value.toDate();
+    } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const [y, m, d] = value.split('-').map(Number);
+        date = new Date(y, m - 1, d);
     } else {
         date = new Date(value);
     }
