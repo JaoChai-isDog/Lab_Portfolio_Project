@@ -2,8 +2,18 @@ const LOCAL_STORAGE_KEY = 'lab_portfolio_labs_v1';
 
 export const EXPERIMENTER_INFO = {
     nameLine: 'ผู้ทำการทดลอง : นางสาวเปมิกา ค้ายาดี รหัสนักศึกษา 67167571',
+    participantLine: 'ผู้เข้าร่วมกิจกรรม : นางสาวเปมิกา ค้ายาดี รหัสนักศึกษา 67167571',
     facultyLine: 'คณะวิศวกรรมศาสตร์ สาขาวิศวกรรมเครื่องกล'
 };
+
+/**
+ * คืนประเภทของผลงาน ('lab' หรือ 'visit') โดยรองรับข้อมูลเก่าที่ยังไม่มี entryType
+ * @param {object} data
+ * @returns {'lab' | 'visit'}
+ */
+export function getEntryType(data) {
+    return data?.entryType === 'visit' ? 'visit' : 'lab';
+}
 
 /**
  * แปลงอักขระพิเศษของ HTML เพื่อป้องกันช่องโหว่ XSS

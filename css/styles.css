@@ -311,6 +311,38 @@ button:disabled {
     margin-bottom: 24px;
 }
 
+/* Entry Type Switcher (Admin) */
+.type-selector-group {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 5px;
+    background: #F2EFE9;
+    border: 1px solid var(--muji-border);
+    border-radius: 10px;
+}
+
+.type-tab {
+    background: transparent;
+    color: var(--muji-text-light);
+    padding: 10px 14px;
+    border-radius: 7px;
+    font-size: 0.94rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.type-tab:hover {
+    color: var(--muji-text-main);
+}
+
+.type-tab.active {
+    background: var(--muji-surface);
+    color: #2C2C2C;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
 .list-bullet {
     color: var(--muji-accent);
     font-size: 0.9rem;
@@ -618,6 +650,53 @@ button:disabled {
 /* ==========================================
    Public Main Lab Cards (Wireframe)
    ========================================== */
+.public-filter-tabs {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-tab {
+    background: var(--muji-surface);
+    color: var(--muji-text-light);
+    border: 1px solid var(--muji-border);
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.filter-tab:hover {
+    border-color: var(--muji-accent);
+    color: var(--muji-text-main);
+}
+
+.filter-tab.active {
+    background: var(--muji-accent);
+    border-color: var(--muji-accent);
+    color: #FFFFFF;
+}
+
+.card-type-badge {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-bottom: 6px;
+}
+
+.badge-lab {
+    background: #F1ECE4;
+    color: #7A6C5B;
+}
+
+.badge-visit {
+    background: #EBF1ED;
+    color: #536B5E;
+}
+
 .public-lab-list {
     display: flex;
     flex-direction: column;
@@ -898,6 +977,13 @@ button:disabled {
     color: #1A1A1A;
     display: flex;
     flex-direction: column;
+}
+
+.page-a4,
+.page-a4 *,
+.page-a4 svg,
+.page-a4 svg text {
+    font-family: 'Sarabun', sans-serif !important;
 }
 
 .page-a4.pdf-exporting {

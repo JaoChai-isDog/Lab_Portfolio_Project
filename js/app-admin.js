@@ -13,6 +13,7 @@ import {
 import {
     compressImageToDataUrl,
     isSafeImageUrl,
+    getEntryType,
     withTimeout,
     getLocalLabs,
     saveLocalLab,
@@ -21,12 +22,13 @@ import {
 } from './utils.js';
 import { renderPdfPreview, downloadLabPdf } from './pdf-export.js';
 import { MUJI_CHART_COLORS, hasValidChartData, renderSmoothScatterSvg } from './chart-helper.js';
-import { SAMPLE_LAB_DATA } from './sample-data.js';
+import { SAMPLE_LAB_DATA, SAMPLE_VISIT_DATA } from './sample-data.js';
 
 const MAX_IMAGES = 3;
 const MAX_CHART_SERIES = MUJI_CHART_COLORS.length;
 
 let currentLabId = generateNewLabId();
+let currentEntryType = 'lab';
 let savedLabsMap = {};
 let uploadedImages = [];
 let imageCaptions = [];
@@ -75,6 +77,52 @@ function showActionFeedback(message, type = 'success') {
     if (!banner) return;
     banner.textContent = message;
     banner.className = `feedback-banner feedback-${type}`;
+}
+
+// ==========================================
+// 0. สลับประเภทผลงาน (ปฏิบัติการ vs บรรยาย/เยี่ยมชม)
+// ==========================================
+function setEntryType(type, shouldAutoSave = false) {
+    currentEntryType = type === 'visit' ? 'visit' : 'lab';
+    const isVisit = currentEntryType === 'visit';
+
+    const btnLab = document.getElementById('btnTypeLab');
+    const btnVisit = document.getElementById('btnTypeVisit');
+    if (btnLab && btnVisit) {
+        btnLab.classList.toggle('active', !isVisit);
+        btnLab.setAttribute('aria-selected', String(!isVisit));
+        btnVisit.classList.toggle('active', isVisit);
+        btnVisit.setAttribute('aria-selected', String(isVisit));
+    }
+
+    document.getElementById('lab-only-fields')?.classList.toggle('hidden', isVisit);
+    document.getElementById('visit-only-fields')?.classList.toggle('hidden', !isVisit);
+
+    const heading = document.getElementById('formHeading');
+    if (heading) {
+        heading.textContent = isVisit ? 'บันทึกข้อมูลการบรรยาย / เยี่ยมชม' : 'บันทึกข้อมูลปฏิบัติการ';
+    }
+
+    const labelDate = document.getElementById('labelLabDate');
+    if (labelDate) {
+        labelDate.textContent = isVisit ? 'วันที่เข้าร่วมกิจกรรม' : 'วันที่ทำการทดลอง';
+    }
+
+    const labelTitle = document.getElementById('labelLabTitle');
+    if (labelTitle) {
+        labelTitle.textContent = isVisit ? 'หัวข้อการบรรยาย / ชื่อกิจกรรมเยี่ยมชม' : 'หัวข้อปฏิบัติการ';
+    }
+
+    const titleInput = document.getElementById('labTitle');
+    if (titleInput) {
+        titleInput.placeholder = isVisit
+            ? 'เช่น ศึกษาดูงานสายการผลิตอัตโนมัติในโรงงานอุตสาหกรรม'
+            : 'เช่น การหาประสิทธิภาพปั๊มน้ำ';
+    }
+
+    if (shouldAutoSave) {
+        scheduleAutoSave();
+    }
 }
 
 // ==========================================
@@ -197,55 +245,28 @@ function removeFlowchartStep() {
     }
 }
 
-function ensureAdvisorOption(advisorName) {
-    const select = document.getElementById('advisorSelect');
-    if (!select || !advisorName) return;
+function ensureSelectOption(selectId, value) {
+    const select = document.getElementById(selectId);
+    if (!select || !value) return;
 
-    const exists = Array.from(select.options).some((opt) => opt.value === advisorName);
+    const exists = Array.from(select.options).some((opt) => opt.value === value);
     if (!exists) {
         const option = document.createElement('option');
-        option.value = advisorName;
-        option.textContent = advisorName;
+        option.value = value;
+        option.textContent = value;
         select.add(option);
     }
 }
 
-function handleAddAdvisor() {
-    const input = document.getElementById('newAdvisor');
-    const select = document.getElementById('advisorSelect');
+function handleAddSelectOption(inputId, selectId) {
+    const input = document.getElementById(inputId);
+    const select = document.getElementById(selectId);
     if (!input || !select) return;
 
     const name = input.value.trim();
     if (!name) return;
 
-    ensureAdvisorOption(name);
-    select.value = name;
-    input.value = '';
-    scheduleAutoSave();
-}
-
-function ensureCourseOption(courseName) {
-    const select = document.getElementById('courseSelect');
-    if (!select || !courseName) return;
-
-    const exists = Array.from(select.options).some((opt) => opt.value === courseName);
-    if (!exists) {
-        const option = document.createElement('option');
-        option.value = courseName;
-        option.textContent = courseName;
-        select.add(option);
-    }
-}
-
-function handleAddCourse() {
-    const input = document.getElementById('newCourse');
-    const select = document.getElementById('courseSelect');
-    if (!input || !select) return;
-
-    const name = input.value.trim();
-    if (!name) return;
-
-    ensureCourseOption(name);
+    ensureSelectOption(selectId, name);
     select.value = name;
     input.value = '';
     scheduleAutoSave();
@@ -262,9 +283,10 @@ function normalizeChartState(rawChart) {
         typeof n === 'string' && n.trim() ? n.trim() : `ชุดข้อมูล ${idx + 1}`
     );
     const seriesCount = seriesNames.length;
-    const rawRows = Array.isArray(rawChart.rows) && rawChart.rows.length > 0
-        ? rawChart.rows
-        : [{ x: '', values: new Array(seriesCount).fill('') }];
+    const rawRows =
+        Array.isArray(rawChart.rows) && rawChart.rows.length > 0
+            ? rawChart.rows
+            : [{ x: '', values: new Array(seriesCount).fill('') }];
 
     const rows = rawRows.map((r) => {
         const vals = Array.isArray(r?.values) ? r.values : [];
@@ -309,7 +331,6 @@ function renderChartTable() {
     const tbody = document.getElementById('chartTableBody');
     if (!thead || !tbody) return;
 
-    // ส่วนหัวตาราง (แกน X + ชื่อชุดข้อมูลแต่ละเส้น)
     thead.innerHTML = '';
     const headRow = document.createElement('tr');
 
@@ -365,7 +386,6 @@ function renderChartTable() {
     headRow.appendChild(thAction);
     thead.appendChild(headRow);
 
-    // แถวข้อมูลตัวเลข
     tbody.innerHTML = '';
     chartState.rows.forEach((row, rIdx) => {
         const tr = document.createElement('tr');
@@ -543,6 +563,29 @@ function collectFormData() {
             .map((input) => input.value.trim())
             .filter(Boolean);
 
+    const baseData = {
+        entryType: currentEntryType,
+        labDate: document.getElementById('labDate')?.value.trim() || '',
+        course: document.getElementById('courseSelect')?.value.trim() || '',
+        title: document.getElementById('labTitle')?.value.trim() || '',
+        images: [...uploadedImages],
+        imageCaptions: uploadedImages.map((_, i) => (imageCaptions[i] || '').trim()),
+        updatedAt: new Date().toISOString()
+    };
+
+    if (currentEntryType === 'visit') {
+        return {
+            ...baseData,
+            visitCategory: document.getElementById('visitCategory')?.value.trim() || 'เข้าฟังการบรรยาย',
+            visitSpeaker: document.getElementById('visitSpeakerSelect')?.value.trim() || '',
+            visitLocation: document.getElementById('visitLocation')?.value.trim() || '',
+            visitTopics: getListValues('visitTopicList'),
+            visitKnowledge: getListValues('visitKnowledgeList'),
+            visitApplication: document.getElementById('visitApplication')?.value.trim() || '',
+            visitSummary: document.getElementById('visitSummary')?.value.trim() || ''
+        };
+    }
+
     const problems = [];
     const problemCards = document.querySelectorAll('#problemList .problem-card');
     problemCards.forEach((card) => {
@@ -569,9 +612,7 @@ function collectFormData() {
     };
 
     return {
-        labDate: document.getElementById('labDate')?.value.trim() || '',
-        course: document.getElementById('courseSelect')?.value.trim() || '',
-        title: document.getElementById('labTitle')?.value.trim() || '',
+        ...baseData,
         advisor: document.getElementById('advisorSelect')?.value.trim() || '',
         responsibility: document.getElementById('responsibility')?.value.trim() || '',
         objectives: getListValues('objectiveList'),
@@ -579,10 +620,7 @@ function collectFormData() {
         problems,
         chart,
         summary: document.getElementById('labSummary')?.value.trim() || '',
-        flowSteps,
-        images: [...uploadedImages],
-        imageCaptions: uploadedImages.map((_, i) => (imageCaptions[i] || '').trim()),
-        updatedAt: new Date().toISOString()
+        flowSteps
     };
 }
 
@@ -590,21 +628,26 @@ function populateForm(data = {}) {
     isPopulatingForm = true;
     clearTimeout(saveTimeout);
 
+    const type = data.entryType ? getEntryType(data) : currentEntryType;
+    setEntryType(type, false);
+
     const setVal = (id, val) => {
         const el = document.getElementById(id);
         if (el) el.value = val || '';
     };
 
+    // ฟิลด์ร่วม
     setVal('labDate', data.labDate);
-    if (data.course) ensureCourseOption(data.course);
+    if (data.course) ensureSelectOption('courseSelect', data.course);
     setVal('courseSelect', data.course);
     setVal('labTitle', data.title);
-    if (data.advisor) ensureAdvisorOption(data.advisor);
+
+    // ฟิลด์ Lab
+    if (data.advisor) ensureSelectOption('advisorSelect', data.advisor);
     setVal('advisorSelect', data.advisor);
     setVal('responsibility', data.responsibility);
     setVal('labSummary', data.summary);
 
-    // ตารางกราฟ
     chartState = normalizeChartState(data.chart);
     setVal('chartTitle', chartState.title);
     setVal('chartXLabel', chartState.xLabel);
@@ -641,6 +684,30 @@ function populateForm(data = {}) {
         steps.forEach((step) => addFlowchartStep(step));
     }
 
+    // ฟิลด์ Visit / บรรยาย
+    setVal('visitCategory', data.visitCategory || 'เข้าฟังการบรรยาย');
+    if (data.visitSpeaker) ensureSelectOption('visitSpeakerSelect', data.visitSpeaker);
+    setVal('visitSpeakerSelect', data.visitSpeaker);
+    setVal('visitLocation', data.visitLocation);
+    setVal('visitApplication', data.visitApplication);
+    setVal('visitSummary', data.visitSummary);
+
+    const topicContainer = document.getElementById('visitTopicList');
+    if (topicContainer) {
+        topicContainer.innerHTML = '';
+        const topics = Array.isArray(data.visitTopics) && data.visitTopics.length ? data.visitTopics : [''];
+        topics.forEach((item) => addListItem('visitTopicList', 'หัวข้อสำคัญข้อที่', item));
+    }
+
+    const knowledgeContainer = document.getElementById('visitKnowledgeList');
+    if (knowledgeContainer) {
+        knowledgeContainer.innerHTML = '';
+        const knowledge =
+            Array.isArray(data.visitKnowledge) && data.visitKnowledge.length ? data.visitKnowledge : [''];
+        knowledge.forEach((item) => addListItem('visitKnowledgeList', 'ความรู้ที่ได้รับข้อที่', item));
+    }
+
+    // รูปภาพ + คำอธิบายใต้ภาพ
     uploadedImages = Array.isArray(data.images) ? data.images.filter(isSafeImageUrl).slice(0, MAX_IMAGES) : [];
     const savedCaptions = Array.isArray(data.imageCaptions) ? data.imageCaptions : [];
     imageCaptions = uploadedImages.map((_, i) => savedCaptions[i] || '');
@@ -657,7 +724,6 @@ async function saveLabNow(showBanner = false) {
     clearTimeout(saveTimeout);
     const labData = collectFormData();
 
-    // 1. บันทึกลง localStorage ทันที เพื่อให้หน้าสาธารณะแสดงผลได้เสมอแม้ Firestore ช้า/มีปัญหา
     saveLocalLab(currentLabId, labData);
     savedLabsMap[currentLabId] = labData;
     renderLabSelector();
@@ -675,7 +741,6 @@ async function saveLabNow(showBanner = false) {
 
     setSaveStatus('(กำลังบันทึกขึ้น Cloud...)');
     try {
-        // ตรวจสอบขนาดเอกสารไม่ให้เกินลิมิต 1 MiB ของ Firestore
         const approxBytes = new Blob([JSON.stringify(labData)]).size;
         if (approxBytes > 950000) {
             throw Object.assign(new Error('ขนาดรูปภาพรวมใหญ่เกิน 1 MB'), { code: 'document-too-large' });
@@ -721,7 +786,7 @@ function scheduleAutoSave() {
 }
 
 // ==========================================
-// 4. จัดการรายการ Lab ที่บันทึกไว้
+// 5. จัดการรายการผลงานที่บันทึกไว้
 // ==========================================
 function renderLabSelector() {
     const selector = document.getElementById('labSelector');
@@ -737,16 +802,18 @@ function renderLabSelector() {
     selector.innerHTML = '';
     const newOpt = document.createElement('option');
     newOpt.value = '';
-    newOpt.textContent = '-- สร้างปฏิบัติการใหม่ --';
+    newOpt.textContent = '-- สร้างรายการใหม่ --';
     selector.appendChild(newOpt);
 
     entries.forEach(([id, data]) => {
         const opt = document.createElement('option');
         opt.value = id;
-        opt.textContent = data?.title || `(ไม่มีชื่อหัวข้อ - ${id})`;
+        const typeTag = getEntryType(data) === 'visit' ? '[บรรยาย/เยี่ยมชม]' : '[ปฏิบัติการ]';
+        opt.textContent = `${typeTag} ${data?.title || `(ไม่มีชื่อหัวข้อ - ${id})`}`;
         selector.appendChild(opt);
-        if (data?.advisor) ensureAdvisorOption(data.advisor);
-        if (data?.course) ensureCourseOption(data.course);
+        if (data?.advisor) ensureSelectOption('advisorSelect', data.advisor);
+        if (data?.course) ensureSelectOption('courseSelect', data.course);
+        if (data?.visitSpeaker) ensureSelectOption('visitSpeakerSelect', data.visitSpeaker);
     });
 
     if (savedLabsMap[currentLabId]) {
@@ -775,16 +842,16 @@ async function loadExistingLabs() {
 
 function startNewLab() {
     currentLabId = generateNewLabId();
-    populateForm({});
+    populateForm({ entryType: currentEntryType });
     renderLabSelector();
-    setSaveStatus('พร้อมสร้างปฏิบัติการใหม่');
+    setSaveStatus('พร้อมสร้างรายการใหม่');
     const banner = document.getElementById('action-feedback');
     if (banner) banner.classList.add('hidden');
 }
 
 async function deleteCurrentLab() {
     if (!savedLabsMap[currentLabId]) return;
-    const confirmed = window.confirm('ต้องการลบปฏิบัติการนี้ออกจากระบบถาวรหรือไม่?');
+    const confirmed = window.confirm('ต้องการลบผลงานนี้ออกจากระบบถาวรหรือไม่?');
     if (!confirmed) return;
 
     deleteLocalLab(currentLabId);
@@ -823,7 +890,7 @@ async function triggerDownloadPdf(triggerBtn) {
 }
 
 // ==========================================
-// 5. ผูก Events และจัดการ Auth State
+// 6. ผูก Events และจัดการ Auth State
 // ==========================================
 function bindEvents() {
     const loginForm = document.getElementById('login-form');
@@ -864,6 +931,14 @@ function bindEvents() {
         await signOut(auth);
     });
 
+    // สลับประเภทผลงาน (ปฏิบัติการ / เข้าฟังการบรรยาย-เยี่ยมชม)
+    document.getElementById('btnTypeLab')?.addEventListener('click', () => {
+        setEntryType('lab', Boolean(savedLabsMap[currentLabId]));
+    });
+    document.getElementById('btnTypeVisit')?.addEventListener('click', () => {
+        setEntryType('visit', Boolean(savedLabsMap[currentLabId]));
+    });
+
     document.getElementById('labSelector')?.addEventListener('change', (e) => {
         const selectedId = e.target.value;
         if (!selectedId) {
@@ -879,27 +954,47 @@ function bindEvents() {
     document.getElementById('btnNewLab')?.addEventListener('click', startNewLab);
     document.getElementById('btnDeleteLab')?.addEventListener('click', deleteCurrentLab);
     document.getElementById('btnLoadSample')?.addEventListener('click', () => {
-        populateForm(SAMPLE_LAB_DATA);
-        showActionFeedback('กรอกข้อมูลตัวอย่างลงฟอร์มแล้ว สามารถกด "บันทึกข้อมูลทันที" หรือ "สร้างเอกสาร PDF" ได้เลย', 'success');
+        const sample = currentEntryType === 'visit' ? SAMPLE_VISIT_DATA : SAMPLE_LAB_DATA;
+        populateForm(sample);
+        showActionFeedback(
+            'กรอกข้อมูลตัวอย่างลงฟอร์มแล้ว สามารถกด "บันทึกข้อมูลทันที" หรือ "สร้างเอกสาร PDF" ได้เลย',
+            'success'
+        );
         scheduleAutoSave();
     });
 
-    document.getElementById('btnAddCourse')?.addEventListener('click', handleAddCourse);
+    // ปุ่มเพิ่มรายการใน Dropdown (รายวิชา, อาจารย์, วิทยากร/หน่วยงาน)
+    document.getElementById('btnAddCourse')?.addEventListener('click', () => {
+        handleAddSelectOption('newCourse', 'courseSelect');
+    });
     document.getElementById('newCourse')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            handleAddCourse();
+            handleAddSelectOption('newCourse', 'courseSelect');
         }
     });
 
-    document.getElementById('btnAddAdvisor')?.addEventListener('click', handleAddAdvisor);
+    document.getElementById('btnAddAdvisor')?.addEventListener('click', () => {
+        handleAddSelectOption('newAdvisor', 'advisorSelect');
+    });
     document.getElementById('newAdvisor')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            handleAddAdvisor();
+            handleAddSelectOption('newAdvisor', 'advisorSelect');
         }
     });
 
+    document.getElementById('btnAddVisitSpeaker')?.addEventListener('click', () => {
+        handleAddSelectOption('newVisitSpeaker', 'visitSpeakerSelect');
+    });
+    document.getElementById('newVisitSpeaker')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddSelectOption('newVisitSpeaker', 'visitSpeakerSelect');
+        }
+    });
+
+    // รายการ dynamic (Lab)
     document.getElementById('btnAddObjective')?.addEventListener('click', () => {
         addListItem('objectiveList', 'วัตถุประสงค์ข้อที่');
     });
@@ -914,6 +1009,15 @@ function bindEvents() {
     });
     document.getElementById('btnRemoveFlowStep')?.addEventListener('click', removeFlowchartStep);
 
+    // รายการ dynamic (Visit / บรรยาย)
+    document.getElementById('btnAddVisitTopic')?.addEventListener('click', () => {
+        addListItem('visitTopicList', 'หัวข้อสำคัญข้อที่');
+    });
+    document.getElementById('btnAddVisitKnowledge')?.addEventListener('click', () => {
+        addListItem('visitKnowledgeList', 'ความรู้ที่ได้รับข้อที่');
+    });
+
+    // กราฟ
     document.getElementById('btnAddChartRow')?.addEventListener('click', addChartRow);
     document.getElementById('btnAddChartSeries')?.addEventListener('click', addChartSeries);
     ['chartTitle', 'chartXLabel', 'chartYLabel'].forEach((id) => {
@@ -922,6 +1026,7 @@ function bindEvents() {
         });
     });
 
+    // อัปโหลดรูปภาพ
     const uploadBox = document.getElementById('uploadBox');
     const imageUpload = document.getElementById('imageUpload');
     if (uploadBox && imageUpload) {
@@ -950,7 +1055,6 @@ function bindEvents() {
         }
     });
 
-    // ปุ่มบันทึกข้อมูลทันที (แสดงสถานะทันทีบนปุ่มและแถบแจ้งเตือน)
     const btnSaveNow = document.getElementById('btnSaveNow');
     btnSaveNow?.addEventListener('click', async () => {
         btnSaveNow.disabled = true;
@@ -963,16 +1067,10 @@ function bindEvents() {
         }
     });
 
-    // ปุ่มสร้างเอกสาร PDF — เปิดพรีวิวทันทีแล้วจัดหน้าอัตโนมัติโดยไม่รอให้ Firestore ค้าง
     document.getElementById('btnPreviewPdf')?.addEventListener('click', () => {
         const labData = collectFormData();
         switchView('preview-view');
-        renderPdfPreview(
-            labData,
-            document.getElementById('pdf-pages-container'),
-            currentLabId
-        );
-        // บันทึกในเบื้องหลังโดยไม่บล็อกหน้าเอกสาร
+        renderPdfPreview(labData, document.getElementById('pdf-pages-container'), currentLabId);
         saveLabNow(false);
     });
 
@@ -998,7 +1096,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (user) {
             await loadExistingLabs();
             if (flowStepCount === 0) {
-                populateForm({});
+                populateForm({ entryType: currentEntryType });
             }
             switchView('admin-form-view');
         } else {

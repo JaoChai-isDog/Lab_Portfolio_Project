@@ -160,7 +160,10 @@ export function hasValidChartData(chartData) {
  * @param {{ width?: number, height?: number }} options
  * @returns {string}
  */
-export function renderSmoothScatterSvg(chartData, { width = 660, height = 310 } = {}) {
+export function renderSmoothScatterSvg(
+    chartData,
+    { width = 660, height = 310, fontFamily = 'inherit' } = {}
+) {
     const seriesList = extractSeriesPoints(chartData);
     if (seriesList.length === 0) {
         return '';
@@ -296,7 +299,7 @@ export function renderSmoothScatterSvg(chartData, { width = 660, height = 310 } 
     `;
 
     return `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" class="muji-chart-svg" role="img" aria-label="${escapeHtml(title || 'กราฟผลการทดลอง')}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" class="muji-chart-svg" style="font-family: ${escapeHtml(fontFamily)};" role="img" aria-label="${escapeHtml(title || 'กราฟผลการทดลอง')}">
             <rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="4" fill="#FFFFFF" stroke="#E5E1D8" stroke-width="1" />
             ${titleSvg}
             ${gridLinesSvg}

@@ -6,8 +6,7 @@
     <title>Admin Workspace | Lab Portfolio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=K2D:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet" crossorigin="anonymous">
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=K2D:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet" crossorigin="anonymous">
     <link rel="stylesheet" href="css/styles.css">
 
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -44,7 +43,7 @@
         <div class="muji-card">
             <div class="admin-header-bar">
                 <div>
-                    <h2>บันทึกข้อมูลปฏิบัติการ</h2>
+                    <h2 id="formHeading">บันทึกข้อมูลผลงาน</h2>
                     <span id="save-status" class="text-light">พร้อมบันทึกข้อมูล</span>
                 </div>
                 <div class="flex-row flex-wrap">
@@ -53,12 +52,12 @@
                 </div>
             </div>
 
-            <!-- แถบเลือก/สร้าง/ลบปฏิบัติการ -->
+            <!-- แถบเลือก/สร้าง/ลบรายการ -->
             <div class="lab-selector-bar">
-                <label for="labSelector">เลือกปฏิบัติการที่ต้องการแก้ไข</label>
+                <label for="labSelector">เลือกผลงานที่ต้องการแก้ไข</label>
                 <div class="flex-row flex-wrap">
                     <select id="labSelector" class="flex-1">
-                        <option value="">-- สร้างปฏิบัติการใหม่ --</option>
+                        <option value="">-- สร้างรายการใหม่ --</option>
                     </select>
                     <button type="button" id="btnNewLab" class="btn-secondary btn-sm">+ สร้างใหม่</button>
                     <button type="button" id="btnLoadSample" class="btn-secondary btn-sm">กรอกตัวอย่าง</button>
@@ -66,13 +65,27 @@
                 </div>
             </div>
 
+            <!-- ตัวเลือกประเภทผลงาน -->
             <div class="form-group">
-                <label for="labDate">วันที่ทำการทดลอง</label>
+                <label>ประเภทผลงานที่ต้องการบันทึก</label>
+                <div id="entryTypeSelector" class="type-selector-group" role="tablist" aria-label="เลือกประเภทผลงาน">
+                    <button type="button" id="btnTypeLab" class="type-tab active" data-type="lab" role="tab" aria-selected="true">
+                        ปฏิบัติการ (Lab)
+                    </button>
+                    <button type="button" id="btnTypeVisit" class="type-tab" data-type="visit" role="tab" aria-selected="false">
+                        เข้าฟังการบรรยาย / เยี่ยมชม
+                    </button>
+                </div>
+            </div>
+
+            <!-- ฟิลด์ร่วม (ใช้ทั้ง 2 ประเภท) -->
+            <div class="form-group">
+                <label id="labelLabDate" for="labDate">วันที่ทำการทดลอง</label>
                 <input type="date" id="labDate" class="auto-save">
             </div>
 
             <div class="form-group">
-                <label for="courseSelect">ชื่อรายวิชา</label>
+                <label for="courseSelect">ชื่อรายวิชา / โครงการ</label>
                 <select id="courseSelect" class="auto-save mb-10">
                     <option value="">-- เลือกรายวิชา --</option>
                 </select>
@@ -83,108 +96,167 @@
             </div>
 
             <div class="form-group">
-                <label for="labTitle">หัวข้อปฏิบัติการ</label>
+                <label id="labelLabTitle" for="labTitle">หัวข้อปฏิบัติการ</label>
                 <input type="text" id="labTitle" class="auto-save" placeholder="เช่น การหาประสิทธิภาพปั๊มน้ำ">
             </div>
 
-            <div class="form-group">
-                <label for="advisorSelect">อาจารย์ที่ปรึกษาประจำปฏิบัติการ</label>
-                <select id="advisorSelect" class="auto-save mb-10">
-                    <option value="">-- เลือกอาจารย์ที่ปรึกษา --</option>
-                </select>
-                <div class="flex-row">
-                    <input type="text" id="newAdvisor" class="flex-1" placeholder="เพิ่มชื่ออาจารย์ที่ปรึกษาใหม่...">
-                    <button type="button" id="btnAddAdvisor" class="btn-secondary">+ เพิ่มชื่อ</button>
+            <!-- ==========================================
+                 ส่วนเฉพาะ: ปฏิบัติการ (Lab)
+                 ========================================== -->
+            <div id="lab-only-fields">
+                <div class="form-group">
+                    <label for="advisorSelect">อาจารย์ที่ปรึกษาประจำปฏิบัติการ</label>
+                    <select id="advisorSelect" class="auto-save mb-10">
+                        <option value="">-- เลือกอาจารย์ที่ปรึกษา --</option>
+                    </select>
+                    <div class="flex-row">
+                        <input type="text" id="newAdvisor" class="flex-1" placeholder="เพิ่มชื่ออาจารย์ที่ปรึกษาใหม่...">
+                        <button type="button" id="btnAddAdvisor" class="btn-secondary">+ เพิ่มชื่อ</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="responsibility">ความรับผิดชอบ</label>
+                    <input type="text" id="responsibility" class="auto-save" placeholder="เช่น บันทึกค่าความดันและคำนวณประสิทธิภาพ">
+                </div>
+
+                <div class="form-group">
+                    <label>วัตถุประสงค์</label>
+                    <div id="objectiveList"></div>
+                    <button type="button" id="btnAddObjective" class="btn-secondary btn-sm mt-10">+ เพิ่มวัตถุประสงค์</button>
+                </div>
+
+                <div class="form-group">
+                    <label>เครื่องมือและอุปกรณ์ที่ใช้ในปฏิบัติการ</label>
+                    <div id="equipmentList"></div>
+                    <button type="button" id="btnAddEquipment" class="btn-secondary btn-sm mt-10">+ เพิ่มอุปกรณ์</button>
+                </div>
+
+                <div class="form-group">
+                    <label>ปัญหาที่พบ และแนวทางการแก้ไข</label>
+                    <div id="problemList"></div>
+                    <button type="button" id="btnAddProblem" class="btn-secondary btn-sm mt-10">+ เพิ่มปัญหาและแนวทางแก้ไข</button>
+                </div>
+
+                <div class="form-group">
+                    <label>กราฟผลการทดลอง (แผนภูมิกระจายเส้นเรียบ — ตารางแบบ Microsoft Word)</label>
+                    <div class="chart-editor-card">
+                        <div class="chart-meta-grid">
+                            <div>
+                                <label for="chartTitle" class="sub-label">ชื่อกราฟ (ไม่บังคับ)</label>
+                                <input type="text" id="chartTitle" class="auto-save" placeholder="เช่น กราฟสมรรถนะปั๊มน้ำ">
+                            </div>
+                            <div>
+                                <label for="chartXLabel" class="sub-label">ชื่อแกน X</label>
+                                <input type="text" id="chartXLabel" class="auto-save" placeholder="เช่น อัตราการไหล (L/min)">
+                            </div>
+                            <div>
+                                <label for="chartYLabel" class="sub-label">ชื่อแกน Y</label>
+                                <input type="text" id="chartYLabel" class="auto-save" placeholder="เช่น ประสิทธิภาพ (%)">
+                            </div>
+                        </div>
+
+                        <div class="chart-table-wrap">
+                            <table id="chartDataTable" class="chart-excel-table">
+                                <thead id="chartTableHead"></thead>
+                                <tbody id="chartTableBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="flex-row flex-wrap mt-10">
+                            <button type="button" id="btnAddChartRow" class="btn-secondary btn-sm">+ เพิ่มแถวข้อมูล</button>
+                            <button type="button" id="btnAddChartSeries" class="btn-secondary btn-sm">+ เพิ่มชุดข้อมูล (เส้นกราฟ)</button>
+                        </div>
+
+                        <div id="adminChartPreview" class="chart-live-preview mt-10"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="labSummary">สรุปผลการทดลอง</label>
+                    <textarea id="labSummary" class="auto-save" placeholder="สรุปผลที่ได้จากการทดลอง..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>ขั้นตอนการทดลอง (Flowchart)</label>
+                    <div class="flowchart-container">
+                        <div class="flow-box radius-pill">Start</div>
+                        <div class="flow-connector flow-connector-admin" aria-hidden="true">
+                            <span class="flow-connector-stem"></span>
+                            <span class="flow-connector-head"></span>
+                        </div>
+                        <div id="flowchartSteps" class="flowchart-steps-col"></div>
+                        <div class="flow-box radius-pill">End</div>
+
+                        <div class="flex-row mt-20" style="justify-content: center;">
+                            <button type="button" id="btnAddFlowStep" class="btn-secondary btn-sm">+ เพิ่มขั้นตอน</button>
+                            <button type="button" id="btnRemoveFlowStep" class="btn-secondary btn-sm">- ลบขั้นตอนสุดท้าย</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="responsibility">ความรับผิดชอบ</label>
-                <input type="text" id="responsibility" class="auto-save" placeholder="เช่น บันทึกค่าความดันและคำนวณประสิทธิภาพ">
-            </div>
+            <!-- ==========================================
+                 ส่วนเฉพาะ: เข้าฟังการบรรยาย / เยี่ยมชม
+                 ========================================== -->
+            <div id="visit-only-fields" class="hidden">
+                <div class="form-group">
+                    <label for="visitCategory">รูปแบบกิจกรรม</label>
+                    <select id="visitCategory" class="auto-save">
+                        <option value="เข้าฟังการบรรยาย">เข้าฟังการบรรยาย</option>
+                        <option value="ศึกษาดูงาน / เยี่ยมชมสถานประกอบการ">ศึกษาดูงาน / เยี่ยมชมสถานประกอบการ</option>
+                        <option value="อบรมเชิงปฏิบัติการ (Workshop)">อบรมเชิงปฏิบัติการ (Workshop)</option>
+                        <option value="สัมมนาทางวิชาการ">สัมมนาทางวิชาการ</option>
+                    </select>
+                </div>
 
-            <div class="form-group">
-                <label>วัตถุประสงค์</label>
-                <div id="objectiveList"></div>
-                <button type="button" id="btnAddObjective" class="btn-secondary btn-sm mt-10">+ เพิ่มวัตถุประสงค์</button>
-            </div>
-
-            <div class="form-group">
-                <label>เครื่องมือและอุปกรณ์ที่ใช้ในปฏิบัติการ</label>
-                <div id="equipmentList"></div>
-                <button type="button" id="btnAddEquipment" class="btn-secondary btn-sm mt-10">+ เพิ่มอุปกรณ์</button>
-            </div>
-
-            <div class="form-group">
-                <label>ปัญหาที่พบ และแนวทางการแก้ไข</label>
-                <div id="problemList"></div>
-                <button type="button" id="btnAddProblem" class="btn-secondary btn-sm mt-10">+ เพิ่มปัญหาและแนวทางแก้ไข</button>
-            </div>
-
-            <div class="form-group">
-                <label>กราฟผลการทดลอง (แผนภูมิกระจายเส้นเรียบ — ตารางแบบ Microsoft Word)</label>
-                <div class="chart-editor-card">
-                    <div class="chart-meta-grid">
-                        <div>
-                            <label for="chartTitle" class="sub-label">ชื่อกราฟ (ไม่บังคับ)</label>
-                            <input type="text" id="chartTitle" class="auto-save" placeholder="เช่น กราฟสมรรถนะปั๊มน้ำ">
-                        </div>
-                        <div>
-                            <label for="chartXLabel" class="sub-label">ชื่อแกน X</label>
-                            <input type="text" id="chartXLabel" class="auto-save" placeholder="เช่น อัตราการไหล (L/min)">
-                        </div>
-                        <div>
-                            <label for="chartYLabel" class="sub-label">ชื่อแกน Y</label>
-                            <input type="text" id="chartYLabel" class="auto-save" placeholder="เช่น ประสิทธิภาพ (%)">
-                        </div>
+                <div class="form-group">
+                    <label for="visitSpeakerSelect">วิทยากร / หน่วยงานผู้จัด</label>
+                    <select id="visitSpeakerSelect" class="auto-save mb-10">
+                        <option value="">-- เลือกวิทยากร / หน่วยงาน --</option>
+                    </select>
+                    <div class="flex-row">
+                        <input type="text" id="newVisitSpeaker" class="flex-1" placeholder="เพิ่มชื่อวิทยากรหรือหน่วยงานใหม่...">
+                        <button type="button" id="btnAddVisitSpeaker" class="btn-secondary">+ เพิ่มชื่อ</button>
                     </div>
+                </div>
 
-                    <div class="chart-table-wrap">
-                        <table id="chartDataTable" class="chart-excel-table">
-                            <thead id="chartTableHead"></thead>
-                            <tbody id="chartTableBody"></tbody>
-                        </table>
-                    </div>
+                <div class="form-group">
+                    <label for="visitLocation">สถานที่ / องค์กรที่เข้าเยี่ยมชม</label>
+                    <input type="text" id="visitLocation" class="auto-save" placeholder="เช่น นิคมอุตสาหกรรมอมตะซิตี้ หรือ ห้องประชุมอาคาร 11 มหาวิทยาลัยศรีปทุม">
+                </div>
 
-                    <div class="flex-row flex-wrap mt-10">
-                        <button type="button" id="btnAddChartRow" class="btn-secondary btn-sm">+ เพิ่มแถวข้อมูล</button>
-                        <button type="button" id="btnAddChartSeries" class="btn-secondary btn-sm">+ เพิ่มชุดข้อมูล (เส้นกราฟ)</button>
-                    </div>
+                <div class="form-group">
+                    <label>หัวข้อสำคัญ / เนื้อหาที่ได้รับฟัง</label>
+                    <div id="visitTopicList"></div>
+                    <button type="button" id="btnAddVisitTopic" class="btn-secondary btn-sm mt-10">+ เพิ่มหัวข้อสำคัญ</button>
+                </div>
 
-                    <div id="adminChartPreview" class="chart-live-preview mt-10"></div>
+                <div class="form-group">
+                    <label>ความรู้และทักษะที่ได้รับ</label>
+                    <div id="visitKnowledgeList"></div>
+                    <button type="button" id="btnAddVisitKnowledge" class="btn-secondary btn-sm mt-10">+ เพิ่มความรู้ที่ได้รับ</button>
+                </div>
+
+                <div class="form-group">
+                    <label for="visitApplication">การนำไปประยุกต์ใช้ในงานวิศวกรรม / การเรียน</label>
+                    <textarea id="visitApplication" class="auto-save" placeholder="อธิบายแนวทางการนำความรู้ที่ได้ไปต่อยอดหรือประยุกต์ใช้..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="visitSummary">สรุปผลการเข้าร่วมกิจกรรม</label>
+                    <textarea id="visitSummary" class="auto-save" placeholder="สรุปภาพรวมและความประทับใจจากการเข้าฟังการบรรยายหรือเยี่ยมชม..."></textarea>
                 </div>
             </div>
 
+            <!-- ฟิลด์อัปโหลดภาพประกอบ (ใช้ร่วมกันทั้ง 2 ประเภท) -->
             <div class="form-group">
-                <label for="labSummary">สรุปผลการทดลอง</label>
-                <textarea id="labSummary" class="auto-save" placeholder="สรุปผลที่ได้จากการทดลอง..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="imageUpload">ภาพประกอบปฏิบัติการ (สูงสุด 3 ภาพ — กรอกคำอธิบายใต้ภาพสำหรับ PDF ได้)</label>
+                <label for="imageUpload">ภาพประกอบกิจกรรม (สูงสุด 3 ภาพ — กรอกคำอธิบายใต้ภาพสำหรับ PDF ได้)</label>
                 <div id="uploadBox" class="upload-box" role="button" tabindex="0">
                     คลิกเพื่อเลือกรูปภาพประกอบ (รองรับ JPG, PNG สูงสุด 3 ภาพ)
                 </div>
                 <input type="file" id="imageUpload" accept="image/*" multiple class="hidden">
                 <div id="imagePreview" class="img-preview-grid"></div>
-            </div>
-
-            <div class="form-group">
-                <label>Flowchart</label>
-                <div class="flowchart-container">
-                    <div class="flow-box radius-pill">Start</div>
-                    <div class="flow-connector flow-connector-admin" aria-hidden="true">
-                        <span class="flow-connector-stem"></span>
-                        <span class="flow-connector-head"></span>
-                    </div>
-                    <div id="flowchartSteps" class="flowchart-steps-col"></div>
-                    <div class="flow-box radius-pill">End</div>
-
-                    <div class="flex-row mt-20" style="justify-content: center;">
-                        <button type="button" id="btnAddFlowStep" class="btn-secondary btn-sm">+ เพิ่มขั้นตอน</button>
-                        <button type="button" id="btnRemoveFlowStep" class="btn-secondary btn-sm">- ลบขั้นตอนสุดท้าย</button>
-                    </div>
-                </div>
             </div>
 
             <div id="action-feedback" class="feedback-banner hidden"></div>
@@ -196,7 +268,7 @@
         </div>
     </div>
 
-    <!-- หน้าเอกสาร A4 พรีวิว / ปริ้น / ดาวน์โหลด PDF (ตามแบบ Wireframe) -->
+    <!-- หน้าเอกสาร A4 พรีวิว / ปริ้น / ดาวน์โหลด PDF -->
     <div id="preview-view" class="view-section view-wide hidden">
         <div class="no-print flex-row space-between flex-wrap mb-10">
             <button type="button" id="btnBackToForm" class="btn-secondary">← กลับไปแก้ไข</button>
@@ -207,7 +279,7 @@
         </div>
 
         <div id="pdf-pages-container" class="pdf-pages-container">
-            <!-- หน้ากระดาษ A4 จะถูกสร้างอัตโนมัติ (1 หรือ 2 หน้า) ตรงนี้ -->
+            <!-- หน้ากระดาษ A4 จะถูกสร้างตรงนี้ -->
         </div>
 
         <div class="no-print pdf-bottom-actions">

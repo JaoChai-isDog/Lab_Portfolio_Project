@@ -1,4 +1,4 @@
-import { escapeHtml, isSafeImageUrl, formatThaiDate, EXPERIMENTER_INFO } from './utils.js';
+import { escapeHtml, isSafeImageUrl, formatThaiDate, EXPERIMENTER_INFO, getEntryType } from './utils.js';
 import { buildPublicLabUrl, renderQRCode } from './qrcode-helper.js';
 import { hasValidChartData, renderSmoothScatterSvg } from './chart-helper.js';
 
@@ -32,50 +32,68 @@ function createA4PageShell(pageNumber) {
     return { wrapper, pageEl };
 }
 
-/**
- * สร้างเอกสารขนาด A4 แบบ 2 หน้าชัดเจน:
- * - หน้า 1: หัวข้อ, ข้อมูลผู้ทดลอง/คณะ-สาขา, อาจารย์, ความรับผิดชอบ, QR Code, วัตถุประสงค์, อุปกรณ์, Flowchart, ตารางปัญหา-แนวทาง
- * - หน้า 2: กราฟผลการทดลอง (เหนือสรุปผล), สรุปผล, ภาพประกอบ 1:1 จำนวน 3 ช่องพร้อมคำอธิบายใต้ภาพเฉพาะ PDF
- * @param {object} labData
- * @param {HTMLElement | null} pagesContainer
- * @param {string} labId
- */
-export function renderPdfPreview(labData, pagesContainer, labId) {
-    if (!pagesContainer) return;
-    pagesContainer.innerHTML = '';
+function renderBulletItems(items) {
+    const list = Array.isArray(items) && items.filter(Boolean).length ? items.filter(Boolean) : ['-'];
+    return list
+        .map(
+            (item) => `
+                <li class="pdf-list-item">
+                    <span class="pdf-bullet">•</span>
+                    <span class="pdf-list-text">${escapeHtml(item)}</span>
+                </li>`
+        )
+        .join('');
+}
 
+function renderPdfImageCells(images, imageCaptions) {
+    const safeImages = Array.isArray(images) ? images.filter(isSafeImageUrl).slice(0, 3) : [];
+    const captions = Array.isArray(imageCaptions) ? imageCaptions : [];
+    const cells = [];
+
+    for (let i = 0; i < 3; i += 1) {
+        if (safeImages[i]) {
+            const rawCaption = (captions[i] || '').trim();
+            const captionLabel = rawCaption
+                ? `รูปที่ ${i + 1} ${escapeHtml(rawCaption)}`
+                : `รูปที่ ${i + 1}`;
+            cells.push(`
+                <div class="pdf-image-cell">
+                    <div class="pdf-image-slot">
+                        <img src="${escapeHtml(safeImages[i])}" alt="ภาพประกอบที่ ${i + 1}">
+                    </div>
+                    <p class="pdf-image-caption">${captionLabel}</p>
+                </div>
+            `);
+        } else {
+            cells.push(`
+                <div class="pdf-image-cell">
+                    <div class="pdf-image-slot pdf-image-placeholder">ภาพประกอบ</div>
+                </div>
+            `);
+        }
+    }
+    return cells.join('');
+}
+
+/**
+ * สร้างเอกสาร A4 สำหรับประเภท ปฏิบัติการ (2 หน้า: หน้า 1 เนื้อหาหลัก, หน้า 2 กราฟ+สรุปผล+ภาพประกอบ)
+ */
+function renderLabPdf(labData, pagesContainer, labId) {
     const labDateText = labData.labDate ? formatThaiDate(labData.labDate) : '-';
     const courseText = labData.course?.trim() || '-';
     const title = labData.title?.trim() || 'ไม่ได้ระบุหัวข้อปฏิบัติการ';
     const advisorText = `อาจารย์ที่ปรึกษา: ${labData.advisor?.trim() || '-'}`;
     const responsibilityText = `ความรับผิดชอบ: ${labData.responsibility?.trim() || '-'}`;
 
-    const objectives = Array.isArray(labData.objectives) ? labData.objectives.filter(Boolean) : [];
-    const equipments = Array.isArray(labData.equipments) ? labData.equipments.filter(Boolean) : [];
+    const objectivesHtml = renderBulletItems(labData.objectives);
+    const equipmentsHtml = renderBulletItems(labData.equipments);
+
     const problems = Array.isArray(labData.problems)
         ? labData.problems.filter((p) => p && (p.issue || p.solution))
         : [];
     const flowSteps = Array.isArray(labData.flowSteps) ? labData.flowSteps.filter(Boolean) : [];
-    const images = Array.isArray(labData.images) ? labData.images.filter(isSafeImageUrl).slice(0, 3) : [];
-    const imageCaptions = Array.isArray(labData.imageCaptions) ? labData.imageCaptions : [];
     const summaryText = labData.summary?.trim() || '-';
     const summaryHtml = `\u00A0\u00A0\u00A0\u00A0${escapeHtml(summaryText)}`;
-
-    const renderBulletItems = (items) => {
-        const list = items.length ? items : ['-'];
-        return list
-            .map(
-                (item) => `
-                    <li class="pdf-list-item">
-                        <span class="pdf-bullet">•</span>
-                        <span class="pdf-list-text">${escapeHtml(item)}</span>
-                    </li>`
-            )
-            .join('');
-    };
-
-    const objectivesHtml = renderBulletItems(objectives);
-    const equipmentsHtml = renderBulletItems(equipments);
 
     const arrowHtml =
         '<div class="flow-connector" aria-hidden="true"><span class="flow-connector-stem"></span><span class="flow-connector-head"></span></div>';
@@ -102,44 +120,24 @@ export function renderPdfPreview(labData, pagesContainer, labId) {
               .join('')
         : '<tr><td>-</td><td>-</td></tr>';
 
-    // กราฟผลการทดลอง (วางเหนือสรุปผลในหน้า 2)
     const chartSectionHtml = hasValidChartData(labData.chart)
         ? `
             <div class="pdf-block pdf-avoid-break">
                 <h3 class="pdf-heading">กราฟผลการทดลอง</h3>
                 <div class="pdf-chart-box">
-                    ${renderSmoothScatterSvg(labData.chart, { width: 660, height: 300 })}
+                    ${renderSmoothScatterSvg(labData.chart, {
+                        width: 660,
+                        height: 300,
+                        fontFamily: "'Sarabun', sans-serif"
+                    })}
                 </div>
             </div>
         `
         : '';
 
-    // ช่องรูปภาพสัดส่วน 1:1 จำนวน 3 ช่อง + คำอธิบายใต้ภาพเฉพาะใน PDF (รูปที่ 1 ...)
-    const imageCells = [];
-    for (let i = 0; i < 3; i += 1) {
-        if (images[i]) {
-            const rawCaption = (imageCaptions[i] || '').trim();
-            const captionLabel = rawCaption
-                ? `รูปที่ ${i + 1} ${escapeHtml(rawCaption)}`
-                : `รูปที่ ${i + 1}`;
-            imageCells.push(`
-                <div class="pdf-image-cell">
-                    <div class="pdf-image-slot">
-                        <img src="${escapeHtml(images[i])}" alt="ภาพประกอบปฏิบัติการที่ ${i + 1}">
-                    </div>
-                    <p class="pdf-image-caption">${captionLabel}</p>
-                </div>
-            `);
-        } else {
-            imageCells.push(`
-                <div class="pdf-image-cell">
-                    <div class="pdf-image-slot pdf-image-placeholder">ภาพประกอบ</div>
-                </div>
-            `);
-        }
-    }
+    const imageCellsHtml = renderPdfImageCells(labData.images, labData.imageCaptions);
 
-    // ---------- หน้า 1 ----------
+    // หน้า 1
     const { wrapper: page1Wrapper, pageEl: page1El } = createA4PageShell(1);
     page1El.innerHTML = `
         <div class="pdf-header">
@@ -194,7 +192,7 @@ export function renderPdfPreview(labData, pagesContainer, labId) {
         </div>
     `;
 
-    // ---------- หน้า 2 (กราฟ + สรุปผล + ภาพประกอบพร้อมคำอธิบายใต้ภาพ) ----------
+    // หน้า 2 (กราฟ + สรุปผล + ภาพประกอบพร้อมคำอธิบายใต้ภาพ)
     const { wrapper: page2Wrapper, pageEl: page2El } = createA4PageShell(2);
     page2El.innerHTML = `
         <div class="pdf-body">
@@ -206,15 +204,101 @@ export function renderPdfPreview(labData, pagesContainer, labId) {
             </div>
 
             <div class="pdf-images-grid pdf-avoid-break">
-                ${imageCells.join('')}
+                ${imageCellsHtml}
             </div>
         </div>
     `;
 
     pagesContainer.append(page1Wrapper, page2Wrapper);
+    renderQRCode(page1El.querySelector('.pdf-qr-box'), buildPublicLabUrl(labId), 84);
+}
 
-    const qrBox = page1El.querySelector('.pdf-qr-box');
-    renderQRCode(qrBox, buildPublicLabUrl(labId), 84);
+/**
+ * สร้างเอกสาร A4 สำหรับประเภท เข้าฟังการบรรยาย / เยี่ยมชม
+ */
+function renderVisitPdf(visitData, pagesContainer, labId) {
+    const dateText = visitData.labDate ? formatThaiDate(visitData.labDate) : '-';
+    const courseText = visitData.course?.trim() || '-';
+    const title = visitData.title?.trim() || 'ไม่ได้ระบุชื่อกิจกรรม';
+    const categoryText = `รูปแบบกิจกรรม: ${visitData.visitCategory?.trim() || 'เข้าฟังการบรรยาย / เยี่ยมชม'}`;
+    const speakerText = `วิทยากร / หน่วยงาน: ${visitData.visitSpeaker?.trim() || '-'}`;
+    const locationText = `สถานที่: ${visitData.visitLocation?.trim() || '-'}`;
+
+    const topicsHtml = renderBulletItems(visitData.visitTopics);
+    const knowledgeHtml = renderBulletItems(visitData.visitKnowledge);
+    const applicationHtml = `\u00A0\u00A0\u00A0\u00A0${escapeHtml(visitData.visitApplication?.trim() || '-')}`;
+    const summaryHtml = `\u00A0\u00A0\u00A0\u00A0${escapeHtml(visitData.visitSummary?.trim() || '-')}`;
+    const imageCellsHtml = renderPdfImageCells(visitData.images, visitData.imageCaptions);
+
+    const { wrapper: page1Wrapper, pageEl: page1El } = createA4PageShell(1);
+    page1El.innerHTML = `
+        <div class="pdf-header">
+            <div class="pdf-header-left">
+                <p class="pdf-header-meta pdf-header-top-line">
+                    <span>วันที่เข้าร่วมกิจกรรม: ${escapeHtml(dateText)}</span>
+                    <span class="pdf-header-sep">|</span>
+                    <span>รายวิชา / โครงการ: ${escapeHtml(courseText)}</span>
+                </p>
+                <h2>${escapeHtml(title)}</h2>
+                <p class="pdf-header-meta">${escapeHtml(EXPERIMENTER_INFO.participantLine)}</p>
+                <p class="pdf-header-meta">${escapeHtml(EXPERIMENTER_INFO.facultyLine)}</p>
+                <p class="pdf-header-meta">${escapeHtml(categoryText)}</p>
+                <p class="pdf-header-meta">${escapeHtml(speakerText)}</p>
+                <p class="pdf-header-meta">${escapeHtml(locationText)}</p>
+            </div>
+            <div class="pdf-qr-box"></div>
+        </div>
+        <div class="pdf-body">
+            <div class="pdf-two-col">
+                <div class="pdf-col-left">
+                    <div class="pdf-block">
+                        <h3 class="pdf-heading">หัวข้อสำคัญ / เนื้อหาที่ได้รับฟัง</h3>
+                        <ul class="pdf-list">${topicsHtml}</ul>
+                    </div>
+                </div>
+                <div class="pdf-col-right">
+                    <div class="pdf-block">
+                        <h3 class="pdf-heading">ความรู้และทักษะที่ได้รับ</h3>
+                        <ul class="pdf-list">${knowledgeHtml}</ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pdf-block pdf-avoid-break">
+                <h3 class="pdf-heading">การนำไปประยุกต์ใช้ในงานวิศวกรรม / การเรียน</h3>
+                <p class="pdf-summary-text">${applicationHtml}</p>
+            </div>
+
+            <div class="pdf-block pdf-avoid-break">
+                <h3 class="pdf-heading">สรุปผลการเข้าร่วมกิจกรรม</h3>
+                <p class="pdf-summary-text">${summaryHtml}</p>
+            </div>
+
+            <div class="pdf-images-grid pdf-avoid-break">
+                ${imageCellsHtml}
+            </div>
+        </div>
+    `;
+
+    pagesContainer.append(page1Wrapper);
+    renderQRCode(page1El.querySelector('.pdf-qr-box'), buildPublicLabUrl(labId), 84);
+}
+
+/**
+ * สร้างเนื้อหาเอกสารขนาด A4 ตามประเภทผลงาน ('lab' หรือ 'visit')
+ * @param {object} data
+ * @param {HTMLElement | null} pagesContainer
+ * @param {string} labId
+ */
+export function renderPdfPreview(data, pagesContainer, labId) {
+    if (!pagesContainer) return;
+    pagesContainer.innerHTML = '';
+
+    if (getEntryType(data) === 'visit') {
+        renderVisitPdf(data, pagesContainer, labId);
+    } else {
+        renderLabPdf(data, pagesContainer, labId);
+    }
 }
 
 /**
@@ -243,8 +327,16 @@ export async function downloadLabPdf(pagesContainer, title = 'Portfolio') {
             .replace(/[\\/:*?"<>|]+/g, '_')
             .slice(0, 60) || 'Portfolio';
 
-    if (document.fonts && document.fonts.ready) {
-        await document.fonts.ready;
+    if (document.fonts) {
+        await Promise.allSettled([
+            document.fonts.load('400 16px "Sarabun"', 'กขคABC123'),
+            document.fonts.load('500 16px "Sarabun"', 'กขคABC123'),
+            document.fonts.load('600 16px "Sarabun"', 'กขคABC123'),
+            document.fonts.load('700 16px "Sarabun"', 'กขคABC123')
+        ]);
+        if (document.fonts.ready) {
+            await document.fonts.ready;
+        }
     }
 
     const pageEls = Array.from(pagesContainer.querySelectorAll('.page-a4'));
@@ -272,7 +364,8 @@ export async function downloadLabPdf(pagesContainer, title = 'Portfolio') {
                     height,
                     style: {
                         margin: '0',
-                        transform: 'none'
+                        transform: 'none',
+                        fontFamily: "'Sarabun', sans-serif"
                     }
                 });
             } finally {

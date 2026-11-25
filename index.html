@@ -22,8 +22,15 @@
             <p class="text-light profile-bio">มหาวิทยาลัยศรีปทุม</p>
         </header>
 
+        <!-- แถบกรองประเภทผลงาน -->
+        <div id="public-filter-tabs" class="public-filter-tabs mb-20" role="tablist" aria-label="กรองประเภทผลงาน">
+            <button type="button" class="filter-tab active" data-filter="all" role="tab" aria-selected="true">ทั้งหมด</button>
+            <button type="button" class="filter-tab" data-filter="lab" role="tab" aria-selected="false">ปฏิบัติการ</button>
+            <button type="button" class="filter-tab" data-filter="visit" role="tab" aria-selected="false">บรรยาย / เยี่ยมชม</button>
+        </div>
+
         <div id="public-lab-list" class="public-lab-list">
-            <!-- รายการการ์ดปฏิบัติการแสดงตรงนี้ -->
+            <!-- รายการการ์ดผลงานแสดงตรงนี้ -->
         </div>
 
         <footer class="public-footer">
@@ -31,7 +38,7 @@
         </footer>
     </div>
 
-    <!-- หน้ารายละเอียดปฏิบัติการสาธารณะ (ตามแบบ Wireframe) -->
+    <!-- หน้ารายละเอียดผลงานสาธารณะ (รองรับทั้งปฏิบัติการ และ บรรยาย/เยี่ยมชม) -->
     <div id="portfolio-detail-view" class="view-section hidden">
         <div class="muji-card detail-wireframe">
             <button type="button" id="btnBackToList" class="btn-text mb-10">← กลับไปหน้าหลัก</button>
@@ -41,41 +48,69 @@
                 <h1 id="web-title">หัวข้อปฏิบัติการ</h1>
                 <p id="web-experimenter" class="detail-subtitle"></p>
                 <p id="web-faculty" class="detail-subtitle"></p>
-                <p id="web-advisor" class="detail-subtitle"></p>
-                <p id="web-responsibility" class="detail-subtitle"></p>
+                <p id="web-detail-meta-1" class="detail-subtitle"></p>
+                <p id="web-detail-meta-2" class="detail-subtitle"></p>
+                <p id="web-detail-meta-3" class="detail-subtitle hidden"></p>
             </div>
             <hr class="divider">
 
-            <section class="detail-section">
-                <h3>วัตถุประสงค์</h3>
-                <ul id="web-objectives" class="detail-list"></ul>
-            </section>
+            <!-- เนื้อหาเฉพาะ: ปฏิบัติการ (Lab) -->
+            <div id="web-lab-sections">
+                <section class="detail-section">
+                    <h3>วัตถุประสงค์</h3>
+                    <ul id="web-objectives" class="detail-list"></ul>
+                </section>
 
-            <section id="web-equipments-section" class="detail-section">
-                <h3>อุปกรณ์ที่ใช้</h3>
-                <ul id="web-equipments" class="detail-list"></ul>
-            </section>
+                <section id="web-equipments-section" class="detail-section">
+                    <h3>อุปกรณ์ที่ใช้</h3>
+                    <ul id="web-equipments" class="detail-list"></ul>
+                </section>
 
-            <section id="web-problems-section" class="detail-section">
-                <h3>ปัญหาที่พบและแนวทางการแก้ไข</h3>
-                <ul id="web-problems" class="detail-list"></ul>
-            </section>
+                <section id="web-problems-section" class="detail-section">
+                    <h3>ปัญหาที่พบและแนวทางการแก้ไข</h3>
+                    <ul id="web-problems" class="detail-list"></ul>
+                </section>
 
-            <section id="web-flowchart-section" class="detail-section">
-                <h3 class="text-center">ขั้นตอนการทดลอง</h3>
-                <div id="web-flowchart" class="detail-flowchart mt-10"></div>
-            </section>
+                <section id="web-flowchart-section" class="detail-section">
+                    <h3 class="text-center">ขั้นตอนการทดลอง</h3>
+                    <div id="web-flowchart" class="detail-flowchart mt-10"></div>
+                </section>
 
-            <section id="web-chart-section" class="detail-section hidden">
-                <h3>กราฟผลการทดลอง</h3>
-                <div id="web-chart" class="detail-chart-box mt-10"></div>
-            </section>
+                <section id="web-chart-section" class="detail-section hidden">
+                    <h3>กราฟผลการทดลอง</h3>
+                    <div id="web-chart" class="detail-chart-box mt-10"></div>
+                </section>
 
-            <section class="detail-section">
-                <h3>สรุปผล</h3>
-                <p id="web-summary" class="detail-summary-paragraph"></p>
-            </section>
+                <section class="detail-section">
+                    <h3>สรุปผล</h3>
+                    <p id="web-summary" class="detail-summary-paragraph"></p>
+                </section>
+            </div>
 
+            <!-- เนื้อหาเฉพาะ: เข้าฟังการบรรยาย / เยี่ยมชม -->
+            <div id="web-visit-sections" class="hidden">
+                <section class="detail-section">
+                    <h3>หัวข้อสำคัญ / เนื้อหาที่ได้รับฟัง</h3>
+                    <ul id="web-visit-topics" class="detail-list"></ul>
+                </section>
+
+                <section class="detail-section">
+                    <h3>ความรู้และทักษะที่ได้รับ</h3>
+                    <ul id="web-visit-knowledge" class="detail-list"></ul>
+                </section>
+
+                <section class="detail-section">
+                    <h3>การนำไปประยุกต์ใช้</h3>
+                    <p id="web-visit-application" class="detail-summary-paragraph"></p>
+                </section>
+
+                <section class="detail-section">
+                    <h3>สรุปผลการเข้าร่วมกิจกรรม</h3>
+                    <p id="web-visit-summary" class="detail-summary-paragraph"></p>
+                </section>
+            </div>
+
+            <!-- แกลเลอรีภาพประกอบ (ไม่มีคำอธิบายใต้ภาพบนหน้าเว็บสาธารณะ) -->
             <section class="detail-section">
                 <div id="web-gallery" class="detail-gallery">
                     <div id="web-gallery-main" class="detail-gallery-main"></div>
