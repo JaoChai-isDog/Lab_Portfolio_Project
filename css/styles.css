@@ -761,6 +761,47 @@ button:disabled {
     margin-bottom: 4px;
 }
 
+.public-contact-corner {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.contact-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--muji-border);
+    color: var(--muji-text-main);
+    text-decoration: none;
+    font-size: 0.86rem;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease;
+}
+
+.contact-item:hover {
+    border-color: var(--muji-accent);
+    color: var(--muji-accent-hover);
+    transform: translateY(-1px);
+}
+
+.contact-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+    display: block;
+}
+
 .public-footer {
     position: fixed;
     left: 16px;
@@ -1229,6 +1270,14 @@ button:disabled {
     min-width: 200px;
     padding: 13px 28px;
     font-size: 1rem;
+}
+
+@media (max-width: 960px) {
+    .public-contact-corner {
+        position: static;
+        align-items: flex-end;
+        margin-bottom: 14px;
+    }
 }
 
 @media (max-width: 600px) {
