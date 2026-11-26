@@ -155,9 +155,54 @@ export function hasValidChartData(chartData) {
 }
 
 /**
+ * คำนวณขอบเขตแกนอัตโนมัติ:
+ * - หากข้อมูลมีช่วงแคบและอยู่ห่างจาก 0 (เช่น อุณหภูมิ 30.8–34.6 °C) จะซูมเข้าสู่ช่วงข้อมูลจริง
+ *   พร้อมเว้นขอบบน-ล่างอย่างเหมาะสม เพื่อให้เห็นแนวโน้มเส้นกราฟชัดเจนไม่แบนเป็นเส้นตรง
+ * - หากข้อมูลใกล้ 0 หรือเริ่มจาก 0 อยู่แล้ว จะเริ่มแกนที่ 0 ตามปกติ
+ * @param {number[]} values
+ * @param {number} targetTicks
+ * @param {boolean} isYAxis
+ * @returns {{ axisMin: number, axisMax: number, step: number }}
+ */
+function computeAutoAxisBounds(values, targetTicks, isYAxis = false) {
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const span = rawMax - rawMin;
+
+    if (span === 0) {
+        const margin = rawMin === 0 ? 5 : Math.max(Math.abs(rawMin) * 0.1, 1);
+        const step = niceStep(margin * 2, targetTicks);
+        const axisMin = Math.floor((rawMin - margin) / step) * step;
+        const axisMax = Math.ceil((rawMax + margin) / step) * step;
+        return { axisMin, axisMax, step };
+    }
+
+    const shouldStartAtZero = rawMin >= 0 && rawMin <= span * 0.5;
+
+    let paddedMin;
+    let paddedMax;
+    if (shouldStartAtZero) {
+        paddedMin = 0;
+        paddedMax = isYAxis ? rawMax + span * 0.1 : rawMax;
+    } else {
+        const padRatio = isYAxis ? 0.15 : 0.05;
+        paddedMin = rawMin - span * padRatio;
+        if (rawMin >= 0 && paddedMin < 0) paddedMin = 0;
+        paddedMax = rawMax + span * padRatio;
+    }
+
+    const step = niceStep(paddedMax - paddedMin, targetTicks);
+    const axisMin = Math.floor((paddedMin + step * 1e-9) / step) * step;
+    let axisMax = Math.ceil((paddedMax - step * 1e-9) / step) * step;
+    if (axisMax <= axisMin) axisMax = axisMin + step;
+
+    return { axisMin, axisMax, step };
+}
+
+/**
  * วาดกราฟแผนภูมิกระจายที่มีเส้นเรียบและตัวแสดงข้อมูล (Smooth Scatter with Markers) โทนสี Muji เป็น SVG
  * @param {object} chartData
- * @param {{ width?: number, height?: number }} options
+ * @param {{ width?: number, height?: number, fontFamily?: string }} options
  * @returns {string}
  */
 export function renderSmoothScatterSvg(
@@ -176,36 +221,22 @@ export function renderSmoothScatterSvg(
     const allX = seriesList.flatMap((s) => s.points.map((p) => p.x));
     const allY = seriesList.flatMap((s) => s.points.map((p) => p.y));
 
-    let minX = Math.min(...allX);
-    let maxX = Math.max(...allX);
-    let minY = Math.min(...allY);
-    let maxY = Math.max(...allY);
+    const { axisMin: axisMinX, axisMax: axisMaxX, step: xStep } = computeAutoAxisBounds(allX, 6, false);
+    const { axisMin: axisMinY, axisMax: axisMaxY, step: yStep } = computeAutoAxisBounds(allY, 5, true);
 
-    // เริ่มจาก 0 เมื่อข้อมูลเป็นบวกทั้งหมด เพื่อให้เหมือนกราฟใน Microsoft Word / Excel
-    if (minX > 0) minX = 0;
-    if (minY > 0) minY = 0;
-
-    if (maxX === minX) {
-        maxX = minX + (minX === 0 ? 10 : Math.abs(minX) * 0.5);
-    }
-    if (maxY === minY) {
-        maxY = minY + (minY === 0 ? 10 : Math.abs(minY) * 0.5);
+    // จัดวาง Legend ด้านบนเหนือพื้นที่กราฟ เพื่อไม่ให้ทับจุดข้อมูลหรือเส้นกราฟ
+    const maxItemsPerRow = 3;
+    const legendRows = [];
+    for (let i = 0; i < seriesList.length; i += maxItemsPerRow) {
+        legendRows.push(seriesList.slice(i, i + maxItemsPerRow));
     }
 
-    const xStep = niceStep(maxX - minX, 6);
-    const yStep = niceStep(maxY - minY, 5);
-
-    const axisMinX = Math.floor(minX / xStep) * xStep;
-    let axisMaxX = Math.ceil(maxX / xStep) * xStep;
-    if (axisMaxX <= maxX) axisMaxX += xStep;
-
-    const axisMinY = Math.floor(minY / yStep) * yStep;
-    let axisMaxY = Math.ceil(maxY / yStep) * yStep;
-    if (axisMaxY <= maxY) axisMaxY += yStep;
-
-    const padTop = title ? 36 : 18;
+    const titleHeight = title ? 26 : 6;
+    const legendRowHeight = 20;
+    const legendTotalHeight = legendRows.length * legendRowHeight + 6;
+    const padTop = titleHeight + legendTotalHeight + 10;
     const padRight = 24;
-    const padBottom = 52;
+    const padBottom = 50;
     const padLeft = 66;
     const plotW = width - padLeft - padRight;
     const plotH = height - padTop - padBottom;
@@ -257,40 +288,37 @@ export function renderSmoothScatterSvg(
             const dotsEl = plotted
                 .map(
                     (pt) =>
-                        `<circle cx="${pt.px.toFixed(2)}" cy="${pt.py.toFixed(2)}" r="4.5" fill="${series.color}" stroke="#FFFFFF" stroke-width="1.2" />`
+                        `<circle cx="${pt.px.toFixed(2)}" cy="${pt.py.toFixed(2)}" r="4.2" fill="${series.color}" stroke="#FFFFFF" stroke-width="1.2" />`
                 )
                 .join('');
             return `<g>${pathEl}${dotsEl}</g>`;
         })
         .join('');
 
-    // Legend มุมขวาบนภายในกรอบกราฟคล้าย Microsoft Word
-    const legendRowH = 20;
-    const legendBoxW = Math.min(230, Math.max(130, ...seriesList.map((s) => s.name.length * 7.2 + 34)));
-    const legendBoxH = seriesList.length * legendRowH + 12;
-    const legendX = padLeft + plotW - legendBoxW - 10;
-    const legendY = padTop + 10;
+    // Legend จัดกึ่งกลางด้านบนเหนือกรอบกราฟ ไม่บังข้อมูล
+    const legendSvg = legendRows
+        .map((rowItems, rIdx) => {
+            const cy = titleHeight + 14 + rIdx * legendRowHeight;
+            const itemWidths = rowItems.map((s) => Math.max(90, s.name.length * 6.8 + 38));
+            const totalW = itemWidths.reduce((sum, w) => sum + w, 0) + (rowItems.length - 1) * 14;
+            let cursorX = Math.max(padLeft, (width - totalW) / 2);
 
-    const legendItemsSvg = seriesList
-        .map((s, idx) => {
-            const cy = legendY + 16 + idx * legendRowH;
-            return `
-                <line x1="${legendX + 10}" y1="${cy}" x2="${legendX + 26}" y2="${cy}" stroke="${s.color}" stroke-width="2.2" />
-                <circle cx="${legendX + 18}" cy="${cy}" r="3.8" fill="${s.color}" />
-                <text x="${legendX + 34}" y="${cy + 4}" fill="#4A4A4A" font-size="11.5">${escapeHtml(s.name)}</text>
-            `;
+            return rowItems
+                .map((s, i) => {
+                    const startX = cursorX;
+                    cursorX += itemWidths[i] + 14;
+                    return `
+                        <line x1="${startX.toFixed(1)}" y1="${cy}" x2="${(startX + 18).toFixed(1)}" y2="${cy}" stroke="${s.color}" stroke-width="2.2" />
+                        <circle cx="${(startX + 9).toFixed(1)}" cy="${cy}" r="3.6" fill="${s.color}" />
+                        <text x="${(startX + 24).toFixed(1)}" y="${cy + 4}" fill="#4A4A4A" font-size="11.5">${escapeHtml(s.name)}</text>
+                    `;
+                })
+                .join('');
         })
         .join('');
 
-    const legendSvg = `
-        <g>
-            <rect x="${legendX}" y="${legendY}" width="${legendBoxW}" height="${legendBoxH}" rx="4" fill="rgba(255,255,255,0.9)" stroke="#E5E1D8" stroke-width="1" />
-            ${legendItemsSvg}
-        </g>
-    `;
-
     const titleSvg = title
-        ? `<text x="${width / 2}" y="22" text-anchor="middle" fill="#2C2C2C" font-size="13.5" font-weight="600">${escapeHtml(title)}</text>`
+        ? `<text x="${width / 2}" y="20" text-anchor="middle" fill="#2C2C2C" font-size="13.5" font-weight="600">${escapeHtml(title)}</text>`
         : '';
 
     const axisTitlesSvg = `
@@ -302,10 +330,10 @@ export function renderSmoothScatterSvg(
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" class="muji-chart-svg" style="font-family: ${escapeHtml(fontFamily)};" role="img" aria-label="${escapeHtml(title || 'กราฟผลการทดลอง')}">
             <rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="4" fill="#FFFFFF" stroke="#E5E1D8" stroke-width="1" />
             ${titleSvg}
+            <g>${legendSvg}</g>
             ${gridLinesSvg}
             ${axesSvg}
             ${seriesSvg}
-            ${legendSvg}
             ${axisTitlesSvg}
         </svg>
     `;
